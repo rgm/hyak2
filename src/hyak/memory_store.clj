@@ -6,8 +6,10 @@
   ha/IFStore
   (-features [_]
     (:features @*state))
+
   (-add! [_ fkey]
     (swap! *state update :features #(conj % fkey)))
+
   (-remove! [_ fkey]
     (swap! *state (fn [state]
                     (-> state

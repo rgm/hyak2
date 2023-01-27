@@ -22,9 +22,9 @@
   "Create a Redis feature store.
 
    Use the default `root-key` to be able to easily use Flipper-based tools."
-  ([carmine-opts]
-   (create-fstore! "flipper_features" carmine-opts))
-  ([root-key carmine-opts]
+  ([carmine-opts opts]
+   (create-fstore! "flipper_features" carmine-opts opts))
+  ([root-key carmine-opts _opts]
    (->FeatureStore root-key carmine-opts)))
 
 (defn destroy-fstore!
