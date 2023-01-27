@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+cd `dirname $0`/.. # work from project root
+. script/_prelude.bash
+
+script/kaocha unit
+script/cljfmt check
+script/lint

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e # stop on error
+[ -n "$DEBUG" ] && set -v
+
+cd `dirname $0`/.. # work from project root
+[ -f config.env ] && . config.env
+
+# https://github.com/DarthSim/overmind
+overmind start --daemonize
+sleep 1 && overmind c repl

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+cd `dirname $0`/.. # work from project root
+
+clojure -Sdeps '{:deps {cljfmt/cljfmt {:mvn/version "RELEASE"}}}' -M -m cljfmt.main --indents .indentation.clj "$@"

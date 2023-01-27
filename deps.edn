@@ -1,0 +1,13 @@
+{:paths ["src"]
+
+ :deps
+ {rgm/hyak.adapter {:local/root "modules/adapter"}}
+
+ :aliases
+ {:test
+  {:extra-paths ["test"
+                 "modules/fstore-redis/src"
+                 "modules/fstore-postgres/src"]
+   :extra-deps
+   {lambdaisland/kaocha  {:mvn/version "1.75.1190"}
+    com.taoensso/carmine {:mvn/version "3.3.0-alpha6"}}}}}
