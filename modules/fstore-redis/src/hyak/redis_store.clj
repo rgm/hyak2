@@ -1,7 +1,7 @@
 (ns hyak.redis-store
   "A redis persistent feature (dark launch) store. Follows the same data format
-   as https://github.com/jnunemaker/flipper so that that project's UI tools
-   for managing flipper state should work."
+   as https://github.com/jnunemaker/flipper so that that project's UI tools for
+   the Redis adapter for managing feature state should work."
   (:require
    [hyak.adapter     :as ha]
    [taoensso.carmine :as car :refer [wcar]]))

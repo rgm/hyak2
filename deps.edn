@@ -5,9 +5,9 @@
 
  :aliases
  {:test
-  {:extra-paths ["test"
-                 "modules/fstore-redis/src"
-                 "modules/fstore-postgres/src"]
+  {:extra-paths ["test"]
    :extra-deps
-   {lambdaisland/kaocha  {:mvn/version "1.75.1190"}
-    com.taoensso/carmine {:mvn/version "3.3.0-alpha6"}}}}}
+   {lambdaisland/kaocha       {:mvn/version "1.76.1230"}
+    org.slf4j/slf4j-nop       {:mvn/version "2.0.6"}
+    rgm/hyak.postgres-adapter {:local/root "modules/fstore-postgres"}
+    rgm/hyak.redis-adapter    {:local/root "modules/fstore-redis"}}}}}

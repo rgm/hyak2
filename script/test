@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 
-cd `dirname $0`/.. # work from project root
-. script/_prelude.bash
+# test
+# run tests
 
-script/kaocha unit
-script/cljfmt check
-script/lint
+set -o errexit
+set -o nounset
+set -o pipefail
+IFS=$'\n\t'
+if [[ "${TRACE-0}" == "1" ]]; then
+  set -o xtrace
+fi
+cd "$(dirname "$0")/.."
+
+clj-kondo --lint src test modules/fstore-postgres/src modules/fstore-redis/src
+clojure -Sdeps '{:deps {cljfmt/cljfmt {:mvn/version "RELEASE"}}}' -M -m cljfmt.main check
+script/kaocha

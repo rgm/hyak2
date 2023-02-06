@@ -33,13 +33,12 @@
     (redis-store/destroy-fstore! fstore)))
 
 (defn run-with-postgres-store [test-fn]
-  (let [fstore (postgres-store/create-fstore!
-                "hyak_core2_test"
-                (System/getenv "JDBC_DATABASE_URL")
-                {:clean? true})]
+  (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
+        prefix   "hyak_core2_test_"
+        fstore   (postgres-store/create-fstore!
+                  prefix jdbc-url {:recreate-tables? true})]
     (binding [*fstore* fstore]
-      (test-fn))
-    (postgres-store/destroy-fstore! fstore)))
+      (test-fn))))
 
 ;; }}}
 

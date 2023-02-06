@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# act
+# use nektos/act to simulate github actions on push
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -9,6 +12,4 @@ if [[ "${TRACE-0}" == "1" ]]; then
 fi
 cd "$(dirname "$0")/.."
 
-[[ -f "config.env" ]] && . "config.env"  # supply env vars
-
-clojure -A:test -M -m kaocha.runner "$@"
+act push --container-architecture linux/amd64

@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-cd `dirname $0`/.. # work from project root
-
-clj-kondo --lint src test
