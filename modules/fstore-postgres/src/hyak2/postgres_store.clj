@@ -1,4 +1,4 @@
-(ns hyak.postgres-store
+(ns hyak2.postgres-store
   "A postgres persistent feature (dark launch) store. Follows the same data format
    as https://github.com/jnunemaker/flipper so that that project's UI tools for
    the ActiveRecord adapter for managing feature state should work for the base
@@ -8,8 +8,10 @@
    [clojure.data.json :as json]
    [hugsql.adapter.next-jdbc]
    [hugsql.core       :as hugsql]
-   [hyak.adapter      :as ha]
+   [hyak2.adapter     :as ha]
    [next.jdbc]))
+
+;; * db access {{{
 
 (let [opts {:adapter (hugsql.adapter.next-jdbc/hugsql-adapter-next-jdbc)
             :quoting :ansi}]
@@ -21,11 +23,14 @@
    hug:create-gates-index
    hug:create-gates-table
    hug:delete-feature
+   hug:delete-gates-for-fkey
    hug:drop-features-index
    hug:drop-features-table
    hug:drop-gates-index
    hug:drop-gates-table
+   hug:insert-gate
    hug:select-features
+   hug:select-gates-for-fkey
    hug:upsert-feature)
   (hugsql/def-db-fns "sql/queries.sql" opts))
 
@@ -70,6 +75,17 @@
       (hug:drop-features-table names)))
   :dropped)
 
+;; }}}
+
+(defn boolean-gate-open? [table-prefix datasource fkey _]
+  (let [params (merge (make-names table-prefix)
+                      {:fkey fkey})]
+    (->> params
+         (hug:select-gates-for-fkey datasource)
+         (filter #(= (select-keys % [:key :value])
+                       {:key "boolean" :value "true"}))
+         seq boolean)))
+
 (defrecord FeatureStore [table-prefix datasource]
   ha/IFStore
   (-features [_]
@@ -85,8 +101,23 @@
       (hug:upsert-feature datasource params)))
 
   (-remove! [_ fkey]
-    (let [params (merge (make-names table-prefix) {:keys [fkey]})]
-      (hug:delete-features datasource params))))
+    (let [params (merge (make-names table-prefix) {:key fkey})]
+      (hug:delete-feature datasource params)))
+
+  (-disable! [_ fkey]
+    (let [params (merge (make-names table-prefix) {:fkey fkey})]
+      (hug:delete-gates-for-fkey datasource params)))
+
+  (-enabled? [_ fkey akey]
+    (boolean-gate-open? table-prefix datasource fkey akey))
+
+  (-enable! [_ fkey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey       fkey
+                         :gate-type  "boolean"
+                         :gate-value "true"})]
+      (hug:insert-gate datasource params)
+      (prn (hug:select-features datasource (make-names table-prefix))))))
 
 (defn create-fstore!
   "Create a postgres feature store. By default reuses any existing data in the

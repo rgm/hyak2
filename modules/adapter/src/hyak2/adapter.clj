@@ -1,4 +1,4 @@
-(ns hyak.adapter
+(ns hyak2.adapter
   "Specs and a protocol for implementing a hyak feature store.")
 
 (defprotocol IFStore

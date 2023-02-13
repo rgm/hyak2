@@ -52,3 +52,15 @@ DELETE FROM :i:features-table-name WHERE key = :key;
 
 -- :name hug:select-features :?
 SELECT key FROM :i:features-table-name;
+
+-- :name hug:insert-gate :! :n
+INSERT INTO :i:gates-table-name
+  (feature_key, key, value)
+  VALUES
+  (:fkey, :gate-type, :gate-value);
+
+-- :name hug:delete-gates-for-fkey :! :n
+DELETE FROM :i:gates-table-name WHERE feature_key = :fkey;
+
+-- :name hug:select-gates-for-fkey :?
+SELECT key, value from :i:gates-table-name WHERE feature_key = :fkey;

@@ -1,4 +1,4 @@
-(ns hyak.core2
+(ns hyak2.core
   "
   A library for managing feature (aka. dark launch) flags.
 
@@ -7,7 +7,7 @@
   store.
   "
   (:require
-   [hyak.adapter :as ha]))
+   [hyak2.adapter :as ha]))
 
 ;; DRAMATIS PERSONAE:
 ;; fstore .................... Feature Store
@@ -46,5 +46,23 @@
   "Disable a feature (ie. all gates) for the fkey."
   [fstore fkey]
   (ha/-disable! fstore fkey))
+
+(defn enabled?
+  "Is the feature `fkey` enabled for actor `akey`?"
+  ([fstore fkey]
+   (enabled? fstore fkey nil))
+  ([fstore fkey akey]
+   (ha/-enabled? fstore fkey akey)))
+
+;; * boolean gate {{{
+
+(defn enable!
+  "Unconditionally enable an fkey."
+  [fstore fkey]
+  (doto fstore
+    (disable! fkey) ;; clear other gates
+    (ha/-enable! fkey)))
+
+;; }}}
 
 ;; vi:fdm=marker

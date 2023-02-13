@@ -1,10 +1,10 @@
-(ns hyak.core2-test
+(ns hyak2.core-test
   (:require
-   [clojure.test        :as t :refer [deftest testing is]]
-   [hyak.core2          :as sut]
-   [hyak.memory-store   :as memory-store]
-   [hyak.postgres-store :as postgres-store]
-   [hyak.redis-store    :as redis-store]))
+   [clojure.test         :as t :refer [deftest testing is]]
+   [hyak2.core           :as sut]
+   [hyak2.memory-store   :as memory-store]
+   [hyak2.postgres-store :as postgres-store]
+   [hyak2.redis-store    :as redis-store]))
 
 (defn make-fkey [s]
   ;; prefix all features so we can clean up strays in persistent stores
@@ -60,5 +60,27 @@
     run-with-memory-store
     run-with-redis-store
     run-with-postgres-store))
+
+(defn boolean-gate-test []
+  (testing "boolean gates work & enable/disable is idempotent"
+    (let [fkey (make-fkey "my-new-feature")]
+      (sut/add! *fstore* fkey nil nil)
+      (is (not (sut/enabled? *fstore* fkey)))
+      (dotimes [_ 2]
+        (sut/enable! *fstore* fkey)
+        (is (sut/enabled? *fstore* fkey)))
+      (dotimes [_ 2]
+        (sut/disable! *fstore* fkey)
+        (is (not (sut/enabled? *fstore* fkey)))))))
+
+(deftest all-stores-boolean-gate-test
+  (doto boolean-gate-test
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
+
+; (deftest updating-expires-at)
+
+; (deftest get-author)
 
 ;; vi:fdm=marker
