@@ -32,13 +32,15 @@
       (test-fn))
     (redis-store/destroy-fstore! fstore)))
 
-(defn run-with-postgres-store [test-fn]
-  (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
-        prefix   "hyak_core2_test_"
-        fstore   (postgres-store/create-fstore!
-                  prefix jdbc-url {:recreate-tables? true})]
-    (binding [*fstore* fstore]
-      (test-fn))))
+(defn run-with-postgres-store
+  ([test-fn]
+   (run-with-postgres-store {:recreate-tables? true} test-fn))
+  ([fstore-opts test-fn]
+   (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
+         prefix   "hyak_core2_test_"
+         fstore   (postgres-store/create-fstore! prefix jdbc-url fstore-opts)]
+     (binding [*fstore* fstore]
+       (test-fn)))))
 
 ;; }}}
 
@@ -78,6 +80,20 @@
     run-with-memory-store
     run-with-redis-store
     run-with-postgres-store))
+
+(deftest postgres-caching-test
+  (run-with-postgres-store
+   {:recreate-tables? true :ttl/threshold 50}
+   (fn []
+     (testing "postgres can cache feature tests"
+       (let [fkey (make-fkey "my-cached-feature")]
+         (sut/add! *fstore* fkey nil nil)
+         (sut/enable! *fstore* fkey)
+         (is (sut/enabled? *fstore* fkey nil))
+         (sut/disable! *fstore* fkey)
+         (is (sut/enabled? *fstore* fkey nil))
+         (Thread/sleep 100)
+         (is (not (sut/enabled? *fstore* fkey nil))))))))
 
 ; (deftest updating-expires-at)
 

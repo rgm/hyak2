@@ -3,12 +3,17 @@
    as https://github.com/jnunemaker/flipper so that that project's UI tools for
    the ActiveRecord adapter for managing feature state should work for the base
    state. (It won't work for the expiry and author data; these are hyak
-   extensions)."
+   extensions).
+
+   Because feature lookups can be frequent and some (like the boolean flag) are
+   highly cacheable, there is optional caching provided by clojure.core.memoize
+   to reduce the load on the database."
   (:require
-   [clojure.data.json :as json]
+   [clojure.core.memoize :as memo]
+   [clojure.data.json    :as json]
    [hugsql.adapter.next-jdbc]
-   [hugsql.core       :as hugsql]
-   [hyak2.adapter     :as ha]
+   [hugsql.core          :as hugsql]
+   [hyak2.adapter        :as ha]
    [next.jdbc]))
 
 ;; * db access {{{
@@ -60,8 +65,7 @@
     (doto datasource
       (hug:clean-features-table names)
       (hug:clean-gates-table names)))
-  :cleaned
-  )
+  :cleaned)
 
 (defn drop-tables!
   "Drop tables used for feature persistence. See
@@ -83,10 +87,26 @@
     (->> params
          (hug:select-gates-for-fkey datasource)
          (filter #(= (select-keys % [:key :value])
-                       {:key "boolean" :value "true"}))
+                     {:key "boolean" :value "true"}))
          seq boolean)))
 
-(defrecord FeatureStore [table-prefix datasource]
+(defn- enabled?
+  "Is the feature enabled for the key?
+
+   This is a separate function outside the protocol so we can use core.memoized
+   on it if requested."
+  [fstore fkey akey]
+  (let [{:keys [table-prefix datasource]} fstore]
+    (boolean-gate-open? table-prefix datasource fkey akey)))
+
+(defn- memoize-fn
+  "Generate a (possibly) TTL-memoized version of `f`.
+
+   See https://github.com/clojure/core.memoize/blob/master/src/main/clojure/clojure/core/memoize.clj#L450 for more detail on TTL cache strategy. TTL is probably the only day-to-day useful one."
+  [f ttl-threshold-msec]
+  (if ttl-threshold-msec (memo/ttl f :ttl/threshold ttl-threshold-msec) f))
+
+(defrecord FeatureStore [table-prefix datasource enabled-pred]
   ha/IFStore
   (-features [_]
     (let [params (make-names table-prefix)
@@ -108,8 +128,8 @@
     (let [params (merge (make-names table-prefix) {:fkey fkey})]
       (hug:delete-gates-for-fkey datasource params)))
 
-  (-enabled? [_ fkey akey]
-    (boolean-gate-open? table-prefix datasource fkey akey))
+  (-enabled? [fstore fkey akey]
+    (enabled-pred fstore fkey akey))
 
   (-enable! [_ fkey]
     (let [params (merge (make-names table-prefix)
@@ -117,7 +137,7 @@
                          :gate-type  "boolean"
                          :gate-value "true"})]
       (hug:insert-gate datasource params)
-      (prn (hug:select-features datasource (make-names table-prefix))))))
+      :enabled)))
 
 (defn create-fstore!
   "Create a postgres feature store. By default reuses any existing data in the
@@ -127,7 +147,9 @@
 
    Supply opts `{:clear-tables? true}` to reuse existing tables but clear
    existing table data.
-   "
+
+   Supply opts `{:ttl/threshold msec}` to memoize the `enabled?` call to
+   reduce db load, at the cost of the TTL's delay in a feature's activation."
   ([table-prefix jdbc-database-url]
    (create-fstore! table-prefix jdbc-database-url {}))
   ([table-prefix jdbc-database-url opts]
@@ -136,7 +158,9 @@
    (create-tables! table-prefix jdbc-database-url)
    (when (:clean-tables? opts)
      (clean-tables! table-prefix jdbc-database-url))
-   (->FeatureStore table-prefix jdbc-database-url)))
+   (->FeatureStore table-prefix
+                   jdbc-database-url
+                   (memoize-fn enabled? (:ttl/threshold opts)))))
 
 (defn destroy-fstore! [{:keys [table-prefix datasource] :as _fstore}]
   (drop-tables! table-prefix datasource)

@@ -53,7 +53,7 @@
   "Purge all feature state from the Redis store, leaving other kvs alone."
   [fstore]
   (doseq [fkey (ha/-features fstore)] ;; destroy all features
-      (ha/-remove! fstore fkey))
+    (ha/-remove! fstore fkey))
   (let [{:keys [carmine-opts root-key]} fstore]
-      (wcar carmine-opts (car/del root-key))) ;; destroy the root key
+    (wcar carmine-opts (car/del root-key))) ;; destroy the root key
   :destroyed)
