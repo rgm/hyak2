@@ -1,11 +1,14 @@
 (ns hyak.postgres-store
   "A postgres persistent feature (dark launch) store. Follows the same data format
    as https://github.com/jnunemaker/flipper so that that project's UI tools for
-   the ActiveRecord adapter for managing feature state should work."
+   the ActiveRecord adapter for managing feature state should work for the base
+   state. (It won't work for the expiry and author data; these are hyak
+   extensions)."
   (:require
+   [clojure.data.json :as json]
    [hugsql.adapter.next-jdbc]
-   [hugsql.core  :as hugsql]
-   [hyak.adapter :as ha]
+   [hugsql.core       :as hugsql]
+   [hyak.adapter      :as ha]
    [next.jdbc]))
 
 (let [opts {:adapter (hugsql.adapter.next-jdbc/hugsql-adapter-next-jdbc)
@@ -17,13 +20,13 @@
    hug:create-features-table
    hug:create-gates-index
    hug:create-gates-table
-   hug:delete-features
+   hug:delete-feature
    hug:drop-features-index
    hug:drop-features-table
    hug:drop-gates-index
    hug:drop-gates-table
    hug:select-features
-   hug:upsert-features)
+   hug:upsert-feature)
   (hugsql/def-db-fns "sql/queries.sql" opts))
 
 (defn- make-names [table-prefix]
@@ -74,9 +77,12 @@
           rows   (hug:select-features datasource params)]
       (into #{} (map :key) rows)))
 
-  (-add! [_ fkey]
-    (let [params (merge (make-names table-prefix) {:keys [[fkey]]})]
-      (hug:upsert-features datasource params)))
+  (-add! [_ fkey expires-at author]
+    (let [row {:key      fkey
+               :metadata (json/write-str {:expires-at (str expires-at)
+                                          :author author})}
+          params (merge (make-names table-prefix) row)]
+      (hug:upsert-feature datasource params)))
 
   (-remove! [_ fkey]
     (let [params (merge (make-names table-prefix) {:keys [fkey]})]

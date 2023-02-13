@@ -1,7 +1,9 @@
 (ns hyak.redis-store
   "A redis persistent feature (dark launch) store. Follows the same data format
    as https://github.com/jnunemaker/flipper so that that project's UI tools for
-   the Redis adapter for managing feature state should work."
+   the Redis adapter for managing feature state should work for the base state.
+   (It won't work for the expiry and author data; these are hyak
+   extensions)."
   (:require
    [hyak.adapter     :as ha]
    [taoensso.carmine :as car :refer [wcar]]))
@@ -11,8 +13,9 @@
   (-features [_]
     (set (wcar carmine-opts (car/smembers root-key))))
 
-  (-add! [_ fkey]
-    (wcar carmine-opts (car/sadd root-key fkey)))
+  (-add! [_ fkey expires-at author]
+    (wcar carmine-opts (car/sadd root-key fkey))
+    :added)
 
   (-remove! [_ fkey]
     (wcar carmine-opts (car/del fkey))

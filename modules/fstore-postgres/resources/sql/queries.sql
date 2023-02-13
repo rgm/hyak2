@@ -1,6 +1,7 @@
 -- :name hug:create-features-table :!
 CREATE TABLE IF NOT EXISTS :i:features-table-name (
-    key       TEXT         NOT NULL
+    key        TEXT        NOT NULL
+  , metadata   JSONB DEFAULT '{}'::jsonb
   , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -40,11 +41,14 @@ DELETE FROM :i:features-table-name;
 -- :name hug:clean-gates :!
 DELETE FROM :i:gates-table-name;
 
--- :name hug:upsert-features :! :n
-INSERT INTO :i:features-table-name (key) VALUES :t*:keys ON CONFLICT (key) DO NOTHING;
+-- :name hug:upsert-feature :! :n
+INSERT INTO :i:features-table-name
+  (key, metadata)
+  VALUES (:key, :metadata::jsonb)
+  ON CONFLICT (key) DO NOTHING; -- make idempotent
 
--- :name hug:delete-features :! :n
-DELETE FROM :i:features-table-name WHERE key IN (:v*:keys);
+-- :name hug:delete-feature :! :n
+DELETE FROM :i:features-table-name WHERE key = :key;
 
 -- :name hug:select-features :?
 SELECT key FROM :i:features-table-name;

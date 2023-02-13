@@ -22,11 +22,19 @@
   (tap> (features fstore))
   (contains? (features fstore) fkey))
 
+(defn- default-expires-at []
+  ;; opinion: a quarter year is as long as this stuff should usually live
+  (.plusMonths (java.time.LocalDateTime/now) 3))
+
 (defn add!
   "Add a feature."
-  [fstore fkey]
-  (ha/-add! fstore fkey)
-  :added)
+  ([fstore fkey]
+   (add! fstore fkey (default-expires-at) nil))
+  ([fstore fkey expires-at]
+   (add! fstore fkey expires-at nil))
+  ([fstore fkey expires-at author]
+   (ha/-add! fstore fkey expires-at author)
+   :added))
 
 (defn remove!
   "Remove a feature entirely."

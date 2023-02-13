@@ -7,8 +7,10 @@
   (-features [_]
     (:features @*state))
 
-  (-add! [_ fkey]
-    (swap! *state update :features #(conj % fkey)))
+  (-add! [_ fkey expires-at author]
+    (swap! *state update :features #(conj % fkey))
+    (swap! *state assoc-in [:meta fkey]
+           {:expires-at expires-at :author author}))
 
   (-remove! [_ fkey]
     (swap! *state (fn [state]
@@ -17,10 +19,5 @@
                         (update :gates dissoc fkey))))))
 
 (defn create-fstore! []
-  (let [initial-state {:features #{} :gates {}}]
+  (let [initial-state {:features #{} :meta {} :gates {}}]
     (->FeatureStore (atom initial-state))))
-
-(comment
-  (def fstore (create-fstore!))
-  (ha/-features fstore)
-  (ha/-add! fstore "test"))

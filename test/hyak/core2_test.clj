@@ -43,15 +43,19 @@
 ;; }}}
 
 (defn add-remove-test []
-  (testing "adding and removing features"
-    (let [fkey (make-fkey "my-new-key")]
+  (testing "adding and removing features is idempotent"
+    (let [fkey       (make-fkey "my-new-feature")
+          expires-at (.plusMinutes (java.time.LocalDateTime/now) 15)
+          author     "ryan@ryanmccuaig.net"]
       (is (not (sut/exists? *fstore* fkey)))
-      (sut/add! *fstore* fkey)
-      (is (sut/exists? *fstore* fkey))
-      (sut/remove! *fstore* fkey)
-      (is (not (sut/exists? *fstore* fkey))))))
+      (dotimes [_ 2]
+        (sut/add! *fstore* fkey expires-at author)
+        (is (sut/exists? *fstore* fkey)))
+      (dotimes [_ 2]
+        (sut/remove! *fstore* fkey)
+        (is (not (sut/exists? *fstore* fkey)))))))
 
-(deftest add-remove-memory-store-test
+(deftest add-remove-all-stores-test
   (doto add-remove-test
     run-with-memory-store
     run-with-redis-store

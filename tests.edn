@@ -4,4 +4,5 @@
    :kaocha.testable/id   :unit
    :kaocha/ns-patterns   ["-test$"]
    :kaocha/source-paths  ["src" "modules"]
-   :kaocha/test-paths    ["test"]}]}
+   :kaocha/test-paths    ["test"]}]
+ :plugins [:notifier]}
