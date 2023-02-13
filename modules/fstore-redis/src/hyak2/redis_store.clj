@@ -11,8 +11,13 @@
 (defn- get-feature [carmine-opts fkey]
   (apply hash-map (wcar carmine-opts (car/hgetall fkey))))
 
-(defn- boolean-gate-open? [gate-values _akey]
+(defn- boolean-gate-open? [gate-values]
   (= "true" (get gate-values "boolean")))
+
+(defn- akey->str [akey] (str "actors/" akey))
+
+(defn- actor-gate-open? [gate-values akey]
+  (= "1" (get gate-values (akey->str akey))))
 
 (defrecord FeatureStore [root-key carmine-opts]
   ha/IFStore
@@ -34,11 +39,20 @@
 
   (-enabled? [_ fkey akey]
     (let [gate-values (get-feature carmine-opts fkey)]
-      (boolean-gate-open? gate-values akey)))
+      (or (boolean-gate-open? gate-values)
+          (actor-gate-open? gate-values akey))))
 
   (-enable! [_ fkey]
     (wcar carmine-opts (car/hset fkey "boolean" "true"))
-    :enabled))
+    :enabled-boolean)
+
+  (-enable-actor! [_ fkey akey]
+    (wcar carmine-opts (car/hset fkey (akey->str akey) "1"))
+    :enabled-actor)
+
+  (-disable-actor! [_ fkey akey]
+    (wcar carmine-opts (car/hdel fkey (akey->str akey)))
+    :disabled-actor))
 
 (defn create-fstore!
   "Create a Redis feature store.

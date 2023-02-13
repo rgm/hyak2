@@ -57,11 +57,27 @@
 ;; * boolean gate {{{
 
 (defn enable!
-  "Unconditionally enable an fkey."
+  "Unconditionally enable a feature."
   [fstore fkey]
   (doto fstore
     (disable! fkey) ;; clear other gates
     (ha/-enable! fkey)))
+
+;; }}}
+;; * actor gate {{{
+
+(defn enable-actor!
+  "Enable a feature for a specific actor."
+  [fstore fkey akey]
+  (ha/-enable-actor! fstore fkey akey))
+
+(defn disable-actor!
+  "Enable a feature for a specific actor."
+  [fstore fkey akey]
+  (ha/-disable-actor! fstore fkey akey))
+
+;; }}}
+;; * group gate {{{
 
 ;; }}}
 

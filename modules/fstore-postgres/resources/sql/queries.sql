@@ -45,7 +45,8 @@ DELETE FROM :i:gates-table-name;
 INSERT INTO :i:features-table-name
   (key, metadata)
   VALUES (:key, :metadata::jsonb)
-  ON CONFLICT (key) DO NOTHING; -- make idempotent
+  ON CONFLICT (key)
+  DO NOTHING; -- make idempotent
 
 -- :name hug:delete-feature :! :n
 DELETE FROM :i:features-table-name WHERE key = :key;
@@ -56,11 +57,19 @@ SELECT key FROM :i:features-table-name;
 -- :name hug:insert-gate :! :n
 INSERT INTO :i:gates-table-name
   (feature_key, key, value)
-  VALUES
-  (:fkey, :gate-type, :gate-value);
+  VALUES (:fkey, :gate-type, :gate-value)
+  ON CONFLICT (feature_key, key, value)
+  DO NOTHING; -- make idempotent
 
 -- :name hug:delete-gates-for-fkey :! :n
 DELETE FROM :i:gates-table-name WHERE feature_key = :fkey;
+
+-- :name hug:delete-gate :! :n
+-- :doc Delete one specific gate
+DELETE FROM :i:gates-table-name WHERE
+      feature_key = :fkey
+  AND key         = :gate-type
+  AND value       = :gate-value;
 
 -- :name hug:select-gates-for-fkey :?
 SELECT key, value from :i:gates-table-name WHERE feature_key = :fkey;

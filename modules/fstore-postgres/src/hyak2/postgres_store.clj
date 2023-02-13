@@ -28,6 +28,7 @@
    hug:create-gates-index
    hug:create-gates-table
    hug:delete-feature
+   hug:delete-gate
    hug:delete-gates-for-fkey
    hug:drop-features-index
    hug:drop-features-table
@@ -81,14 +82,17 @@
 
 ;; }}}
 
-(defn boolean-gate-open? [table-prefix datasource fkey _]
-  (let [params (merge (make-names table-prefix)
-                      {:fkey fkey})]
-    (->> params
-         (hug:select-gates-for-fkey datasource)
-         (filter #(= (select-keys % [:key :value])
-                     {:key "boolean" :value "true"}))
-         seq boolean)))
+(defn boolean-gate-open? [gates]
+  (->> gates
+       (filter #(= (select-keys % [:key :value])
+                   {:key "boolean" :value "true"}))
+       seq boolean))
+
+(defn actor-gate-open? [gates akey]
+  (->> gates
+       (filter #(= (select-keys % [:key :value])
+                   {:key "actor" :value akey}))
+       seq boolean))
 
 (defn- enabled?
   "Is the feature enabled for the key?
@@ -96,8 +100,12 @@
    This is a separate function outside the protocol so we can use core.memoized
    on it if requested."
   [fstore fkey akey]
-  (let [{:keys [table-prefix datasource]} fstore]
-    (boolean-gate-open? table-prefix datasource fkey akey)))
+  (let [{:keys [table-prefix datasource]} fstore
+        params (merge (make-names table-prefix)
+                      {:fkey fkey})
+        gates (hug:select-gates-for-fkey datasource params)]
+    (or (boolean-gate-open? gates)
+        (actor-gate-open? gates akey))))
 
 (defn- memoize-fn
   "Generate a (possibly) TTL-memoized version of `f`.
@@ -137,7 +145,23 @@
                          :gate-type  "boolean"
                          :gate-value "true"})]
       (hug:insert-gate datasource params)
-      :enabled)))
+      :enabled-boolean))
+
+  (-enable-actor! [_ fkey akey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "actor"
+                         :gate-value akey})]
+      (hug:insert-gate datasource params)
+      :enabled-actor))
+
+  (-disable-actor! [_ fkey akey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "actor"
+                         :gate-value akey})]
+      (hug:delete-gate datasource params)
+      :disabled-actor)))
 
 (defn create-fstore!
   "Create a postgres feature store. By default reuses any existing data in the
@@ -165,3 +189,5 @@
 (defn destroy-fstore! [{:keys [table-prefix datasource] :as _fstore}]
   (drop-tables! table-prefix datasource)
   :destroyed)
+
+;; vi:fdm=marker

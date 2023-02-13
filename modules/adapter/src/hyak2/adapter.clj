@@ -28,4 +28,10 @@
     "Close all gates on a feature.")
 
   (-enable! [fstore fkey]
-    "Open boolean gate on a feature."))
+    "Open boolean gate on a feature.")
+
+  (-enable-actor! [fstore fkey akey]
+    "Open actor gate on a feature.")
+
+  (-disable-actor! [fstore fkey akey]
+    "Close actor gate on a feature."))

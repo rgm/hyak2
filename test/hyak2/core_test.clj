@@ -65,7 +65,7 @@
 
 (defn boolean-gate-test []
   (testing "boolean gates work & enable/disable is idempotent"
-    (let [fkey (make-fkey "my-new-feature")]
+    (let [fkey (make-fkey "boolean-feature")]
       (sut/add! *fstore* fkey nil nil)
       (is (not (sut/enabled? *fstore* fkey)))
       (dotimes [_ 2]
@@ -94,6 +94,34 @@
          (is (sut/enabled? *fstore* fkey nil))
          (Thread/sleep 100)
          (is (not (sut/enabled? *fstore* fkey nil))))))))
+
+(defn actor-gate-test []
+  (testing "actor gates work & enable/disable is idempotent"
+    (let [fkey (make-fkey "actor-feature")
+          akey-yep "beta-tester"
+          akey-mmhm "beta-tester-2"
+          akey-nope "regular-user"]
+      (sut/add! *fstore* fkey nil nil)
+      (is (not (sut/enabled? *fstore* fkey akey-yep)))
+      (is (not (sut/enabled? *fstore* fkey akey-mmhm)))
+      (is (not (sut/enabled? *fstore* fkey akey-nope)))
+      (dotimes [_ 2]
+        (sut/enable-actor! *fstore* fkey akey-yep)
+        (is (sut/enabled? *fstore* fkey akey-yep))
+        (is (not (sut/enabled? *fstore* fkey akey-mmhm)))
+        (is (not (sut/enabled? *fstore* fkey akey-nope))))
+      (dotimes [_ 2]
+        (sut/disable-actor! *fstore* fkey akey-yep)
+        (sut/enable-actor! *fstore* fkey akey-mmhm)
+        (is (not (sut/enabled? *fstore* fkey akey-yep)))
+        (is (sut/enabled? *fstore* fkey akey-mmhm))
+        (is (not (sut/enabled? *fstore* fkey akey-nope)))))))
+
+(deftest all-stores-actor-test
+  (doto actor-gate-test
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
 
 ; (deftest updating-expires-at)
 
