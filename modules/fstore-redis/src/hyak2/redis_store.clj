@@ -7,6 +7,7 @@
   (:require
    [clojure.string   :as string]
    [hyak2.adapter    :as ha]
+   [hyak2.time       :as ht]
    [taoensso.carmine :as car :refer [wcar]]))
 
 (defn- get-feature [carmine-opts fkey]
@@ -49,8 +50,12 @@
   (-remove! [_ fkey]
     (doto carmine-opts
       (wcar (car/del fkey))
-      (wcar (car/srem root-key fkey))
-      (wcar (car/del (fkey->meta-key fkey)))))
+      (wcar (car/del (fkey->meta-key fkey)))
+      (wcar (car/srem root-key fkey))))
+
+  (-expired? [_ fkey now]
+    (let [metadata (wcar carmine-opts (car/get (fkey->meta-key fkey)))]
+      (ht/before? (:expires-at metadata) now)))
 
   (-disable! [_ fkey]
     (wcar carmine-opts (car/del fkey)))

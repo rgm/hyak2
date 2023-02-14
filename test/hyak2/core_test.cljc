@@ -1,12 +1,25 @@
 (ns hyak2.core-test
-  (:require
-   [clojure.test         :as t :refer [deftest testing is]]
-   [hyak2.core           :as sut]
-   [hyak2.memory-store   :as memory-store]
-   [hyak2.postgres-store :as postgres-store]
-   [hyak2.redis-store    :as redis-store])
-  (:import
-   [java.time LocalDateTime]))
+  #?(:clj
+     (:require
+      [clojure.core.async         :as a]
+      [clojure.tools.logging.test :refer [logged? with-log]]
+      [clojure.test               :as t :refer [deftest testing is]]
+      [hyak2.core                 :as sut]
+      [hyak2.memory-store         :as memory-store]
+      [hyak2.postgres-store       :as postgres-store]
+      [hyak2.redis-store          :as redis-store]
+      [hyak2.time                 :as ht])
+     :cljs
+     (:require
+      [clojure.core.async         :as a]
+      [clojure.test               :as t :refer [deftest testing is]]
+      [hyak2.core                 :as sut]
+      [hyak2.memory-store         :as memory-store]
+      [hyak2.time                 :as ht])))
+
+;; TODO implement for cljs
+#?(:cljs (defn logged? [_ _ _] false))
+#?(:cljs (defn with-log [_ _]))
 
 (defn make-fkey [s]
   ;; prefix all features so we can clean up strays in persistent stores
@@ -25,54 +38,42 @@
   (binding [*fstore* (memory-store/create-fstore!)]
     (test-fn)))
 
-(defn run-with-redis-store [test-fn]
-  (let [fstore (redis-store/create-fstore!
-                "hyak-core2-test"
-                {:spec {:uri (System/getenv "REDIS_URL")}}
-                {:clean? true})]
-    (binding [*fstore* fstore]
-      (test-fn))
-    (redis-store/destroy-fstore! fstore)))
+#?(:clj (defn run-with-redis-store [test-fn]
+          (let [fstore (redis-store/create-fstore!
+                        "hyak-core2-test"
+                        {:spec {:uri (System/getenv "REDIS_URL")}}
+                        {:clean? true})]
+            (binding [*fstore* fstore]
+              (test-fn))
+            (redis-store/destroy-fstore! fstore)))
+   :cljs (defn run-with-redis-store [_]))
 
-(defn run-with-postgres-store
-  ([test-fn]
-   (run-with-postgres-store {:recreate-tables? true} test-fn))
-  ([fstore-opts test-fn]
-   (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
-         prefix   "hyak_core2_test_"
-         fstore   (postgres-store/create-fstore! prefix jdbc-url fstore-opts)]
-     (binding [*fstore* fstore]
-       (test-fn)))))
+#? (:clj (defn run-with-postgres-store
+           ([test-fn]
+            (run-with-postgres-store {:recreate-tables? true} test-fn))
+           ([fstore-opts test-fn]
+            (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
+                  prefix   "hyak_core2_test_"
+                  fstore   (postgres-store/create-fstore! prefix jdbc-url fstore-opts)]
+              (binding [*fstore* fstore]
+                (test-fn)))))
+    :cljs (defn run-with-postgres-store ([_]) ([_ _])))
 
 ;; }}}
-
-(deftest before?-test
-  ;; ugh dates are easy to mess up, esp w nils
-  (let [before? #'sut/before?
-        present (LocalDateTime/now)
-        past (.minusHours present 1)
-        future (.plusHours present 1)]
-    (is (before? past present))
-    (is (before? present future))
-    (is (not (before? present past)))
-    (is (not (before? future present)))
-    (is (not (before? present nil)))
-    (is (not (before? nil present)))
-    (is (not (before? nil nil)))))
 
 (defn add-remove-test []
   (testing "adding and removing features are idempotent"
     (let [fkey       (make-fkey "my-new-feature")
-          expires-at (.plusMinutes (LocalDateTime/now) 15)
+          expires-at (.plusMinutes (ht/now) 15)
           author     "ryan@ryanmccuaig.net"]
-      (is (not (sut/exists? *fstore* fkey)))
+      (is (not (sut/feature-exists? *fstore* fkey)))
       (dotimes [_ 2]
         (sut/add! *fstore* fkey expires-at author)
-        (is (sut/exists? *fstore* fkey))
+        (is (sut/feature-exists? *fstore* fkey))
         (is (= #{fkey} (sut/features *fstore*))))
       (dotimes [_ 2]
         (sut/remove! *fstore* fkey)
-        (is (not (sut/exists? *fstore* fkey)))))))
+        (is (not (sut/feature-exists? *fstore* fkey)))))))
 
 (deftest add-remove-all-stores-test
   (doto add-remove-test
@@ -109,7 +110,8 @@
          (is (sut/enabled? *fstore* fkey nil))
          (sut/disable! *fstore* fkey)
          (is (sut/enabled? *fstore* fkey nil))
-         (Thread/sleep 100)
+         ;; TODO cross-platform pause
+         (a/<!! (a/timeout 100))
          (is (not (sut/enabled? *fstore* fkey nil))))))))
 
 (defn actor-gate-test []
@@ -152,7 +154,8 @@
       (is (not (sut/enabled? *fstore* fkey akey-nope)))
       (dotimes [_ 2]
         (sut/register-group! *fstore* gkey pred)
-        (is (thrown? Exception (sut/enable-group! *fstore* fkey :unknown-k)))
+        (is (thrown? #? (:clj Exception :cljs js/Error)
+                     (sut/enable-group! *fstore* fkey :unknown-k)))
         (sut/enable-group! *fstore* fkey gkey)
         (is (sut/enabled? *fstore* fkey akey-yep))
         (is (not (sut/enabled? *fstore* fkey akey-nope))))
@@ -167,17 +170,46 @@
     run-with-redis-store
     run-with-postgres-store))
 
+(deftest expired-test
+  (doto
+   #(testing "a feature can be `expired?`"
+      (let [fkey (make-fkey "my-expired-feature")
+            now  (ht/now)
+            past (.minusHours now 1)
+            fut  (.plusHours now 1)]
+        (sut/add! *fstore* fkey past)
+        (is (sut/expired? *fstore* fkey now))
+        (sut/add! *fstore* fkey fut)
+        (is (not (sut/expired? *fstore* fkey now)))))
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
+
 (defn stale-fstore-test []
-  (testing "an `expires-at` in the past mean fstore is `stale?`"
-    (let [fkey   (make-fkey "expired-feature")
-          now    (LocalDateTime/now)
-          past   (.minusHours now 1)
-          future (.plusHours now 1)]
+  (testing "an `expires-at` in the past means fstore is `stale?` and noisy"
+    (let [fkey (make-fkey "expired-feature")
+          now  (ht/now)
+          past (.minusHours now 1)
+          fut  (.plusHours now 1)]
       (is (not (sut/stale? *fstore* now)))
+      (with-log
+        (sut/enabled? *fstore* fkey)
+        (is (not (logged? 'hyak2.core :warn #"expired"))
+            (str "warned but shouldn't have with " *fstore*)))
       (sut/add! *fstore* fkey past)
       (is (sut/stale? *fstore* now))
-      (sut/add! *fstore* fkey future)
-      (is (not (sut/stale? *fstore* now))))))
+      (with-log
+        (sut/enabled? *fstore* fkey)
+        ;; warn, the feature's expired
+        (is (logged? 'hyak2.core :warn #"expired")
+            (str "didn't warn but should have with " *fstore*)))
+      (sut/add! *fstore* fkey fut)
+      (is (not (sut/stale? *fstore* now)))
+      (with-log
+        (sut/enabled? *fstore* fkey)
+        ;; don't warn, we should be OK again
+        (is (not (logged? 'hyak2.core :warn #"expired"))
+            (str "warned but shouldn't have with " *fstore*))))))
 
 (deftest all-stores-stale-test
   (doto stale-fstore-test

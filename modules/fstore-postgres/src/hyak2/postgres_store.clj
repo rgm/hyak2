@@ -1,9 +1,9 @@
 (ns hyak2.postgres-store
-  "A postgres persistent feature (dark launch) store. Follows the same data format
-   as https://github.com/jnunemaker/flipper so that that project's UI tools for
-   the ActiveRecord adapter for managing feature state should work for the base
-   state. (It won't work for the expiry and author data; these are hyak
-   extensions).
+  "A postgres persistent feature (dark launch) store. Follows the same data
+   format as https://github.com/jnunemaker/flipper so that that project's UI
+   tools for the ActiveRecord adapter for managing feature state should work
+   for the base state. (It won't work for the expiry and author data; these are
+   hyak extensions).
 
    Because feature lookups can be frequent and some (like the boolean flag) are
    highly cacheable, there is optional caching provided by clojure.core.memoize
@@ -14,11 +14,37 @@
    [hugsql.adapter.next-jdbc]
    [hugsql.core          :as hugsql]
    [hyak2.adapter        :as ha]
+   [hyak2.time           :as ht]
    [next.jdbc])
   (:import
-   [java.time Instant LocalDateTime ZoneOffset]))
+   (java.time Instant LocalDateTime ZoneOffset)))
 
 ;; * db access {{{
+
+(defn- ldt->string [ldt]
+  (when ldt
+    (let [inst (.toInstant (.atZone ldt ZoneOffset/UTC))]
+      (.toString inst))))
+
+(defn- string->ldt [s]
+  (when s
+    (let [inst (Instant/parse s)]
+      (LocalDateTime/ofInstant inst ZoneOffset/UTC))))
+
+(defn- feature-row->feature
+  "Flatten an {:fkey :metadata} row into a flat map with expires-at parsed.
+
+   Just decodes JSON manually (instead of setting up auto-convert via
+   next.jdbc) so we don't mess with library consumers. "
+  [feature-row]
+  (let [raw-meta (.getValue (:metadata feature-row))
+        metadata (json/read-str raw-meta :key-fn keyword)
+        ?expires-at (:expires-at metadata)]
+    (if ?expires-at
+      (let [expires-at (string->ldt ?expires-at)]
+        (merge metadata {:fkey (:fkey feature-row)
+                         :expires-at expires-at}))
+      (merge metadata {:fkey (:fkey feature-row)}))))
 
 (let [opts {:adapter (hugsql.adapter.next-jdbc/hugsql-adapter-next-jdbc)
             :quoting :ansi}]
@@ -38,6 +64,7 @@
    hug:drop-gates-table
    hug:insert-gate
    hug:select-features
+   hug:select-feature
    hug:select-gates-for-fkey
    hug:upsert-feature)
   (hugsql/def-db-fns "sql/queries.sql" opts))
@@ -128,43 +155,27 @@
   [f ttl-threshold-msec]
   (if ttl-threshold-msec (memo/ttl f :ttl/threshold ttl-threshold-msec) f))
 
-(defn- ldt->string [ldt]
-  (when ldt
-    (let [inst (.toInstant (.atZone ldt ZoneOffset/UTC))]
-      (.toString inst))))
-
-(defn- string->ldt [s]
-  (when s
-    (let [inst (Instant/parse s)]
-      (LocalDateTime/ofInstant inst ZoneOffset/UTC))))
-
-(defn- parse-meta [json-str]
-  (json/read-str json-str
-                 :key-fn keyword
-                 :value-fn (fn [k v]
-                             (if (= k :expires-at)
-                               (string->ldt v)
-                               v))))
-
 (defrecord FeatureStore [table-prefix datasource enabled-pred *group-registry]
   ha/IFStore
   (-features [_]
-    (let [params (make-names table-prefix)
-          rows   (hug:select-features datasource params)]
-      (map (fn [row] (let [metadata (parse-meta (.getValue (:metadata row)))]
-                       (assoc metadata :fkey (:key row))))
-           rows)))
+    (let [params (make-names table-prefix)]
+      (map feature-row->feature (hug:select-features datasource params))))
 
   (-add! [_ fkey expires-at author]
-    (let [row {:key      fkey
+    (let [row {:fkey     fkey
                :metadata (json/write-str {:expires-at (ldt->string expires-at)
                                           :author author})}
           params (merge (make-names table-prefix) row)]
       (hug:upsert-feature datasource params)))
 
   (-remove! [_ fkey]
-    (let [params (merge (make-names table-prefix) {:key fkey})]
+    (let [params (merge (make-names table-prefix) {:fkey fkey})]
       (hug:delete-feature datasource params)))
+
+  (-expired? [_ fkey now]
+    (let [params  (merge (make-names table-prefix) {:fkey fkey})
+          feature (some-> (hug:select-feature datasource params) feature-row->feature)]
+      (ht/before? (:expires-at feature) now)))
 
   (-disable! [_ fkey]
     (let [params (merge (make-names table-prefix) {:fkey fkey})]

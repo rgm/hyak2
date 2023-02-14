@@ -1,3 +1,6 @@
+-- table col names are less than ideal but don't refactor; they match the
+-- ActiveRecord layout for jnunemaker/flipper
+
 -- :name hug:create-features-table :!
 CREATE TABLE IF NOT EXISTS :i:features-table-name (
     key        TEXT        NOT NULL
@@ -44,16 +47,19 @@ DELETE FROM :i:gates-table-name;
 -- :name hug:upsert-feature :! :n
 INSERT INTO :i:features-table-name
   (key, metadata)
-  VALUES (:key, :metadata::jsonb)
+  VALUES (:fkey, :metadata::jsonb)
   -- update metadata on an upsert
   ON CONFLICT (key)
   DO UPDATE SET metadata = EXCLUDED.metadata;
 
 -- :name hug:delete-feature :! :n
-DELETE FROM :i:features-table-name WHERE key = :key;
+DELETE FROM :i:features-table-name WHERE key = :fkey;
 
 -- :name hug:select-features :?
-SELECT key, metadata FROM :i:features-table-name;
+SELECT key AS fkey, metadata FROM :i:features-table-name;
+
+-- :name hug:select-feature :? :1
+SELECT key AS fkey, metadata FROM :i:features-table-name WHERE key = :fkey;
 
 -- :name hug:insert-gate :! :n
 INSERT INTO :i:gates-table-name

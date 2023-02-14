@@ -1,6 +1,7 @@
 (ns hyak2.memory-store
   (:require
-   [hyak2.adapter :as ha]))
+   [hyak2.adapter :as ha]
+   [hyak2.time    :as ht]))
 
 (defn- boolean-gate-open? [gates fkey]
   (boolean (get-in gates [fkey :gate/boolean])))
@@ -34,6 +35,10 @@
                     (-> state
                         (update :fkeys disj fkey)
                         (update :gates dissoc fkey)))))
+
+  (-expired? [_ fkey now]
+    (let [expires-at (get-in @*state [:meta fkey :expires-at])]
+      (ht/before? expires-at now)))
 
   (-disable! [_ fkey]
     ;; "disabled" means just having no gates at all for the fkey

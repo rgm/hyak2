@@ -1,13 +1,15 @@
 {:paths ["src"]
 
  :deps
- {rgm/hyak.adapter {:local/root "modules/adapter"}}
+ {rgm/hyak.adapter            {:local/root "modules/adapter"}
+  org.clojure/tools.logging   {:mvn/version "1.2.4"}}
 
  :aliases
  {:test
   {:extra-paths ["test"]
    :extra-deps
    {lambdaisland/kaocha       {:mvn/version "1.76.1230"}
+    org.clojure/core.async    {:mvn/version "1.6.673"}
     org.slf4j/slf4j-nop       {:mvn/version "2.0.6"}
     rgm/hyak.postgres-adapter {:local/root "modules/fstore-postgres"}
     rgm/hyak.redis-adapter    {:local/root "modules/fstore-redis"}}}}}

@@ -8,7 +8,7 @@
     "Get a seq of all known features in the store. Each feature is a map with
      :fkey plus metadata.")
 
-  (-expired? [fstore fkey]
+  (-expired? [fstore fkey now]
     "Is the feature consided out-of-date (scan these to help with cleanup).")
 
   (-author [fstore fkey]

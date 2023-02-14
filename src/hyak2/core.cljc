@@ -7,10 +7,9 @@
   store.
   "
   (:require
-   [hyak2.adapter :as ha])
-  #?(:clj
-     (:import
-      [java.time LocalDateTime])))
+   #?(:clj [clojure.tools.logging :refer [warn]])
+   [hyak2.adapter :as ha]
+   [hyak2.time    :as ht]))
 
 ;; DRAMATIS PERSONAE:
 ;; fstore .................... Feature Store
@@ -18,37 +17,30 @@
 ;; akey ...................... Actor Key, a string
 ;; gkey ...................... Group Key, a string
 
+;; TODO implement for cljs
+#?(:cljs (defn warn [& _]))
+
 (defn features [fstore]
   (->> fstore ha/-features (map :fkey) set))
 
-(defn exists? [fstore fkey]
+(defn feature-exists? [fstore fkey]
   (contains? (features fstore) fkey))
-
-(defn- default-expires-at []
-  ;; opinion: a quarter year is as long as this stuff should usually live
-  #?(:clj  (.plusMonths (LocalDateTime/now) 3)
-     :cljs (js/Date. (+ (js/Date.) (* 1000 60 60 24 30 3)))))
-
-(defn- before? [a b]
-  #?(:clj  (and a b (.isBefore a b))
-     :cljs (< a b)))
 
 (defn stale?
   "Does the fstore contain any expired features?"
   ([fstore]
-   (stale? fstore #?(:clj  (java.time.LocalDateTime/now)
-                     :cljs (js/Date.))))
+   (stale? fstore (ht/now)))
   ([fstore now]
    (some->> (ha/-features fstore)
             (map :expires-at)
-            (filter #(before? % now))
+            (filter #(ht/before? % now))
             seq
             boolean)))
 
 (defn add!
   "Add a feature."
   ([fstore fkey]
-   (add! fstore fkey (default-expires-at) nil))
+   (add! fstore fkey (ht/default-expires-at) nil))
   ([fstore fkey expires-at]
    (add! fstore fkey expires-at nil))
   ([fstore fkey expires-at author]
@@ -61,6 +53,11 @@
   (ha/-remove! fstore fkey)
   :removed)
 
+(defn expired?
+  "Has the feature expired?"
+  ([fstore fkey] (expired? fstore fkey (ht/now)))
+  ([fstore fkey now] (ha/-expired? fstore fkey now)))
+
 (defn disable!
   "Disable a feature (ie. all gates) for the fkey."
   [fstore fkey]
@@ -72,6 +69,8 @@
   ([fstore fkey]
    (enabled? fstore fkey nil))
   ([fstore fkey akey]
+   (when (expired? fstore fkey)
+     (warn (str "feature \"" fkey "\" has expired")))
    (ha/-enabled? fstore fkey akey)))
 
 ;; * boolean gate {{{
