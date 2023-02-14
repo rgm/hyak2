@@ -12,6 +12,9 @@
 (defn- get-feature [carmine-opts fkey]
   (apply hash-map (wcar carmine-opts (car/hgetall fkey))))
 
+(defn- fkey->meta-key [fkey]
+  (str "metadata:" fkey))
+
 (defn- boolean-gate-open? [gate-values]
   (= "true" (get gate-values "boolean")))
 
@@ -33,20 +36,24 @@
 (defrecord FeatureStore [root-key *group-registry carmine-opts]
   ha/IFStore
   (-features [_]
-    (set (wcar carmine-opts (car/smembers root-key))))
+    (->> (wcar carmine-opts (car/smembers root-key))
+         (map #(assoc (or (wcar carmine-opts (car/get (fkey->meta-key %))) {})
+                      :fkey %))))
 
-  (-add! [_ fkey _expires-at _author]
-    (wcar carmine-opts (car/sadd root-key fkey))
-    :added)
+  (-add! [_ fkey expires-at author]
+    (doto carmine-opts
+      (wcar (car/sadd root-key fkey))
+      (wcar (car/set (fkey->meta-key fkey) {:expires-at expires-at
+                                            :author author}))))
 
   (-remove! [_ fkey]
-    (wcar carmine-opts (car/del fkey))
-    (wcar carmine-opts (car/srem root-key fkey))
-    :removed)
+    (doto carmine-opts
+      (wcar (car/del fkey))
+      (wcar (car/srem root-key fkey))
+      (wcar (car/del (fkey->meta-key fkey)))))
 
   (-disable! [_ fkey]
-    (wcar carmine-opts (car/del fkey))
-    :disabled)
+    (wcar carmine-opts (car/del fkey)))
 
   (-enabled? [_ fkey akey]
     (let [gate-values (get-feature carmine-opts fkey)]
@@ -55,16 +62,13 @@
           (group-gate-open? @*group-registry gate-values akey))))
 
   (-enable! [_ fkey]
-    (wcar carmine-opts (car/hset fkey "boolean" "true"))
-    :enabled-boolean)
+    (wcar carmine-opts (car/hset fkey "boolean" "true")))
 
   (-enable-actor! [_ fkey akey]
-    (wcar carmine-opts (car/hset fkey (akey->str akey) "1"))
-    :enabled-actor)
+    (wcar carmine-opts (car/hset fkey (akey->str akey) "1")))
 
   (-disable-actor! [_ fkey akey]
-    (wcar carmine-opts (car/hdel fkey (akey->str akey)))
-    :disabled-actor)
+    (wcar carmine-opts (car/hdel fkey (akey->str akey))))
 
   (-groups [_]
     (->> @*group-registry keys (map str->gkey) set))
@@ -87,13 +91,17 @@
    Use the default `root-key` to be able to easily use Flipper-based tools."
   ([carmine-opts opts]
    (create-fstore! "flipper_features" carmine-opts opts))
-  ([root-key carmine-opts _opts]
-   (->FeatureStore root-key (atom {}) carmine-opts)))
+  ([root-key carmine-opts opts]
+   (let [fstore (->FeatureStore root-key (atom {}) carmine-opts)]
+     (when (:clean? opts)
+       (doseq [{fkey :fkey} (ha/-features fstore)]
+         (ha/-remove! fstore fkey)))
+     fstore)))
 
 (defn destroy-fstore!
   "Purge all feature state from the Redis store, leaving other kvs alone."
   [fstore]
-  (doseq [fkey (ha/-features fstore)] ;; destroy all features
+  (doseq [{fkey :fkey} (ha/-features fstore)] ;; destroy all features
     (ha/-remove! fstore fkey))
   (let [{:keys [carmine-opts root-key]} fstore]
     (wcar carmine-opts (car/del root-key))) ;; destroy the root key

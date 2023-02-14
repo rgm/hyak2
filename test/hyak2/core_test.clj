@@ -4,7 +4,9 @@
    [hyak2.core           :as sut]
    [hyak2.memory-store   :as memory-store]
    [hyak2.postgres-store :as postgres-store]
-   [hyak2.redis-store    :as redis-store]))
+   [hyak2.redis-store    :as redis-store])
+  (:import
+   [java.time LocalDateTime]))
 
 (defn make-fkey [s]
   ;; prefix all features so we can clean up strays in persistent stores
@@ -44,15 +46,30 @@
 
 ;; }}}
 
+(deftest before?-test
+  ;; ugh dates are easy to mess up, esp w nils
+  (let [before? #'sut/before?
+        present (LocalDateTime/now)
+        past (.minusHours present 1)
+        future (.plusHours present 1)]
+    (is (before? past present))
+    (is (before? present future))
+    (is (not (before? present past)))
+    (is (not (before? future present)))
+    (is (not (before? present nil)))
+    (is (not (before? nil present)))
+    (is (not (before? nil nil)))))
+
 (defn add-remove-test []
   (testing "adding and removing features are idempotent"
     (let [fkey       (make-fkey "my-new-feature")
-          expires-at (.plusMinutes (java.time.LocalDateTime/now) 15)
+          expires-at (.plusMinutes (LocalDateTime/now) 15)
           author     "ryan@ryanmccuaig.net"]
       (is (not (sut/exists? *fstore* fkey)))
       (dotimes [_ 2]
         (sut/add! *fstore* fkey expires-at author)
-        (is (sut/exists? *fstore* fkey)))
+        (is (sut/exists? *fstore* fkey))
+        (is (= #{fkey} (sut/features *fstore*))))
       (dotimes [_ 2]
         (sut/remove! *fstore* fkey)
         (is (not (sut/exists? *fstore* fkey)))))))
@@ -140,7 +157,7 @@
         (is (sut/enabled? *fstore* fkey akey-yep))
         (is (not (sut/enabled? *fstore* fkey akey-nope))))
       (dotimes [_ 2]
-        (sut/unregister-groups! *fstore*)
+        (sut/disable-group! *fstore* fkey gkey)
         (is (not (sut/enabled? *fstore* fkey akey-yep)))
         (is (not (sut/enabled? *fstore* fkey akey-nope)))))))
 
@@ -150,8 +167,22 @@
     run-with-redis-store
     run-with-postgres-store))
 
-; (deftest updating-expires-at)
+(defn stale-fstore-test []
+  (testing "an `expires-at` in the past mean fstore is `stale?`"
+    (let [fkey   (make-fkey "expired-feature")
+          now    (LocalDateTime/now)
+          past   (.minusHours now 1)
+          future (.plusHours now 1)]
+      (is (not (sut/stale? *fstore* now)))
+      (sut/add! *fstore* fkey past)
+      (is (sut/stale? *fstore* now))
+      (sut/add! *fstore* fkey future)
+      (is (not (sut/stale? *fstore* now))))))
 
-; (deftest get-author)
+(deftest all-stores-stale-test
+  (doto stale-fstore-test
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
 
 ;; vi:fdm=marker

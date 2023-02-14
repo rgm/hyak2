@@ -45,21 +45,23 @@ DELETE FROM :i:gates-table-name;
 INSERT INTO :i:features-table-name
   (key, metadata)
   VALUES (:key, :metadata::jsonb)
+  -- update metadata on an upsert
   ON CONFLICT (key)
-  DO NOTHING; -- make idempotent
+  DO UPDATE SET metadata = EXCLUDED.metadata;
 
 -- :name hug:delete-feature :! :n
 DELETE FROM :i:features-table-name WHERE key = :key;
 
 -- :name hug:select-features :?
-SELECT key FROM :i:features-table-name;
+SELECT key, metadata FROM :i:features-table-name;
 
 -- :name hug:insert-gate :! :n
 INSERT INTO :i:gates-table-name
   (feature_key, key, value)
   VALUES (:fkey, :gate-type, :gate-value)
+  -- make idempotent by ignoring insert, we have all possible data already
   ON CONFLICT (feature_key, key, value)
-  DO NOTHING; -- make idempotent
+  DO NOTHING;
 
 -- :name hug:delete-gates-for-fkey :! :n
 DELETE FROM :i:gates-table-name WHERE feature_key = :fkey;

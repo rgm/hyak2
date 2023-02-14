@@ -7,7 +7,10 @@
   store.
   "
   (:require
-   [hyak2.adapter :as ha]))
+   [hyak2.adapter :as ha])
+  #?(:clj
+     (:import
+      [java.time LocalDateTime])))
 
 ;; DRAMATIS PERSONAE:
 ;; fstore .................... Feature Store
@@ -16,15 +19,31 @@
 ;; gkey ...................... Group Key, a string
 
 (defn features [fstore]
-  (ha/-features fstore))
+  (->> fstore ha/-features (map :fkey) set))
 
 (defn exists? [fstore fkey]
-  (tap> (features fstore))
   (contains? (features fstore) fkey))
 
 (defn- default-expires-at []
   ;; opinion: a quarter year is as long as this stuff should usually live
-  (.plusMonths (java.time.LocalDateTime/now) 3))
+  #?(:clj  (.plusMonths (LocalDateTime/now) 3)
+     :cljs (js/Date. (+ (js/Date.) (* 1000 60 60 24 30 3)))))
+
+(defn- before? [a b]
+  #?(:clj  (and a b (.isBefore a b))
+     :cljs (< a b)))
+
+(defn stale?
+  "Does the fstore contain any expired features?"
+  ([fstore]
+   (stale? fstore #?(:clj  (java.time.LocalDateTime/now)
+                     :cljs (js/Date.))))
+  ([fstore now]
+   (some->> (ha/-features fstore)
+            (map :expires-at)
+            (filter #(before? % now))
+            seq
+            boolean)))
 
 (defn add!
   "Add a feature."
@@ -45,7 +64,8 @@
 (defn disable!
   "Disable a feature (ie. all gates) for the fkey."
   [fstore fkey]
-  (ha/-disable! fstore fkey))
+  (ha/-disable! fstore fkey)
+  :disabled)
 
 (defn enabled?
   "Is the feature `fkey` enabled for actor `akey`?"
@@ -62,7 +82,8 @@
   [fstore fkey]
   (doto fstore
     (disable! fkey) ;; clear other gates
-    (ha/-enable! fkey)))
+    (ha/-enable! fkey))
+  :enabled-boolean)
 
 ;; }}}
 ;; * actor gate {{{
@@ -70,12 +91,14 @@
 (defn enable-actor!
   "Enable a feature for a specific actor."
   [fstore fkey akey]
-  (ha/-enable-actor! fstore fkey akey))
+  (ha/-enable-actor! fstore fkey akey)
+  :enabled-actor)
 
 (defn disable-actor!
   "Enable a feature for a specific actor."
   [fstore fkey akey]
-  (ha/-disable-actor! fstore fkey akey))
+  (ha/-disable-actor! fstore fkey akey)
+  :disabled-actor)
 
 ;; }}}
 ;; * group gate {{{
@@ -99,12 +122,14 @@
    some more dynamic store like Redis if that's not flexible enough."
   [fstore gkey pred]
   {:pre [(ifn? pred)]}
-  (ha/-register-group! fstore gkey pred))
+  (ha/-register-group! fstore gkey pred)
+  :registered-group)
 
 (defn unregister-groups!
   "Unregister all groups from the fstore."
   [fstore]
-  (doseq [gkey (ha/-groups fstore)] (ha/-unregister-group! fstore gkey)))
+  (doseq [gkey (ha/-groups fstore)] (ha/-unregister-group! fstore gkey))
+  :unregistered-groups)
 
 (defn enable-group!
   "Enable a feature for a specific group."
@@ -113,12 +138,14 @@
     (when-not (known-group? gkey)
       (throw (ex-info "unknown-group" {:group-key gkey
                                        :known-groups known-group?}))))
-  (ha/-enable-group! fstore fkey gkey))
+  (ha/-enable-group! fstore fkey gkey)
+  :enabled-group)
 
 (defn disable-group!
   "Disable a feature for a specific group."
   [fstore fkey gkey]
-  (ha/-disable-group! fstore fkey gkey))
+  (ha/-disable-group! fstore fkey gkey)
+  :disabled-group)
 
 ;; }}}
 

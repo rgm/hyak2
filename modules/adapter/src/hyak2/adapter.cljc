@@ -2,8 +2,11 @@
   "Specs and a protocol for implementing a hyak feature store.")
 
 (defprotocol IFStore
+  "Reader methods for implementing a feature store (fstore)."
+
   (-features [fstore]
-    "List all known features in the store.")
+    "Get a seq of all known features in the store. Each feature is a map with
+     :fkey plus metadata.")
 
   (-expired? [fstore fkey]
     "Is the feature consided out-of-date (scan these to help with cleanup).")

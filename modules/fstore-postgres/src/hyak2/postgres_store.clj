@@ -14,7 +14,9 @@
    [hugsql.adapter.next-jdbc]
    [hugsql.core          :as hugsql]
    [hyak2.adapter        :as ha]
-   [next.jdbc]))
+   [next.jdbc])
+  (:import
+   [java.time Instant LocalDateTime ZoneOffset]))
 
 ;; * db access {{{
 
@@ -126,16 +128,36 @@
   [f ttl-threshold-msec]
   (if ttl-threshold-msec (memo/ttl f :ttl/threshold ttl-threshold-msec) f))
 
+(defn- ldt->string [ldt]
+  (when ldt
+    (let [inst (.toInstant (.atZone ldt ZoneOffset/UTC))]
+      (.toString inst))))
+
+(defn- string->ldt [s]
+  (when s
+    (let [inst (Instant/parse s)]
+      (LocalDateTime/ofInstant inst ZoneOffset/UTC))))
+
+(defn- parse-meta [json-str]
+  (json/read-str json-str
+                 :key-fn keyword
+                 :value-fn (fn [k v]
+                             (if (= k :expires-at)
+                               (string->ldt v)
+                               v))))
+
 (defrecord FeatureStore [table-prefix datasource enabled-pred *group-registry]
   ha/IFStore
   (-features [_]
     (let [params (make-names table-prefix)
           rows   (hug:select-features datasource params)]
-      (into #{} (map :key) rows)))
+      (map (fn [row] (let [metadata (parse-meta (.getValue (:metadata row)))]
+                       (assoc metadata :fkey (:key row))))
+           rows)))
 
   (-add! [_ fkey expires-at author]
     (let [row {:key      fkey
-               :metadata (json/write-str {:expires-at (str expires-at)
+               :metadata (json/write-str {:expires-at (ldt->string expires-at)
                                           :author author})}
           params (merge (make-names table-prefix) row)]
       (hug:upsert-feature datasource params)))

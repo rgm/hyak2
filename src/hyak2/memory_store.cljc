@@ -19,17 +19,20 @@
 (defrecord FeatureStore [*state]
   ha/IFStore
   (-features [_]
-    (:features @*state))
+    (let [ms (->> (:fkeys @*state)
+                  (map #(assoc (get-in @*state [:meta %])
+                               :fkey %)))]
+      ms))
 
   (-add! [_ fkey expires-at author]
-    (swap! *state update :features #(conj % fkey))
+    (swap! *state update :fkeys #(conj % fkey))
     (swap! *state assoc-in [:meta fkey]
            {:expires-at expires-at :author author}))
 
   (-remove! [_ fkey]
     (swap! *state (fn [state]
                     (-> state
-                        (update :features disj fkey)
+                        (update :fkeys disj fkey)
                         (update :gates dissoc fkey)))))
 
   (-disable! [_ fkey]
@@ -72,5 +75,5 @@
                               (fnil disj #{}) gkey))))
 
 (defn create-fstore! []
-  (let [initial-state {:features #{} :meta {}}]
+  (let [initial-state {:fkeys #{} :meta {}}]
     (->FeatureStore (atom initial-state))))
