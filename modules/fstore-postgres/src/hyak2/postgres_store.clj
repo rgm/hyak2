@@ -94,6 +94,17 @@
                    {:key "actor" :value akey}))
        seq boolean))
 
+(defn group-gate-open? [group-registry gates akey]
+  (let [active-group? (->> gates
+                           (filter #(= (:key %) "group"))
+                           (map :value)
+                           (map keyword)
+                           (into #{}))
+        active-preds (keep (fn [[k v]] (when (active-group? k) v))
+                           group-registry)]
+    (when-not (empty? active-preds)
+      ((apply some-fn active-preds) akey))))
+
 (defn- enabled?
   "Is the feature enabled for the key?
 
@@ -105,7 +116,8 @@
                       {:fkey fkey})
         gates (hug:select-gates-for-fkey datasource params)]
     (or (boolean-gate-open? gates)
-        (actor-gate-open? gates akey))))
+        (actor-gate-open? gates akey)
+        (group-gate-open? @(:*group-registry fstore) gates akey))))
 
 (defn- memoize-fn
   "Generate a (possibly) TTL-memoized version of `f`.
@@ -114,7 +126,7 @@
   [f ttl-threshold-msec]
   (if ttl-threshold-msec (memo/ttl f :ttl/threshold ttl-threshold-msec) f))
 
-(defrecord FeatureStore [table-prefix datasource enabled-pred]
+(defrecord FeatureStore [table-prefix datasource enabled-pred *group-registry]
   ha/IFStore
   (-features [_]
     (let [params (make-names table-prefix)
@@ -144,24 +156,44 @@
                         {:fkey       fkey
                          :gate-type  "boolean"
                          :gate-value "true"})]
-      (hug:insert-gate datasource params)
-      :enabled-boolean))
+      (hug:insert-gate datasource params)))
 
   (-enable-actor! [_ fkey akey]
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
                          :gate-type "actor"
                          :gate-value akey})]
-      (hug:insert-gate datasource params)
-      :enabled-actor))
+      (hug:insert-gate datasource params)))
 
   (-disable-actor! [_ fkey akey]
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
                          :gate-type "actor"
                          :gate-value akey})]
-      (hug:delete-gate datasource params)
-      :disabled-actor)))
+      (hug:delete-gate datasource params)))
+
+  (-groups [_]
+    (->> @*group-registry keys set))
+
+  (-register-group! [_ gkey pred]
+    (swap! *group-registry assoc gkey pred))
+
+  (-unregister-group! [_ gkey]
+    (swap! *group-registry dissoc gkey))
+
+  (-enable-group! [_ fkey gkey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "group"
+                         :gate-value (name gkey)})]
+      (hug:insert-gate datasource params)))
+
+  (-disable-group! [_ fkey gkey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "group"
+                         :gate-value (name gkey)})]
+      (hug:delete-gate datasource params))))
 
 (defn create-fstore!
   "Create a postgres feature store. By default reuses any existing data in the
@@ -184,7 +216,8 @@
      (clean-tables! table-prefix jdbc-database-url))
    (->FeatureStore table-prefix
                    jdbc-database-url
-                   (memoize-fn enabled? (:ttl/threshold opts)))))
+                   (memoize-fn enabled? (:ttl/threshold opts))
+                   (atom {}))))
 
 (defn destroy-fstore! [{:keys [table-prefix datasource] :as _fstore}]
   (drop-tables! table-prefix datasource)

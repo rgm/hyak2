@@ -57,7 +57,8 @@
 ;; * boolean gate {{{
 
 (defn enable!
-  "Unconditionally enable a feature."
+  "Unconditionally enable a feature. Disables any other active gates since
+   they're redundant when the boolean gate is open."
   [fstore fkey]
   (doto fstore
     (disable! fkey) ;; clear other gates
@@ -78,6 +79,46 @@
 
 ;; }}}
 ;; * group gate {{{
+
+(defn register-group!
+  "Register a predicate `f :: akey -> Boolean` that can give a verdict on
+   whether a feature is enabled for a given akey.
+
+   A group is one order removed from an actor. This gate could be simulated by
+   a set of actor gates, but it would be tedious. Instead:
+
+   ```
+   (register-group! fstore \"beta-testers\" #{\"a@example.org\" \"b@other.com\")
+   (enable-group! fstore \"new-feature\" \"beta-testers\")
+   ```
+
+   The persistence layer for the fstores doesn't contain executable code, so
+   the groups have to be registered as part of app startup. It can be hard to
+   avoid having to re-deploy to adjust the group membership predicates so
+   assume these are fairly stable, or provide a predicate that is closed over
+   some more dynamic store like Redis if that's not flexible enough."
+  [fstore gkey pred]
+  {:pre [(ifn? pred)]}
+  (ha/-register-group! fstore gkey pred))
+
+(defn unregister-groups!
+  "Unregister all groups from the fstore."
+  [fstore]
+  (doseq [gkey (ha/-groups fstore)] (ha/-unregister-group! fstore gkey)))
+
+(defn enable-group!
+  "Enable a feature for a specific group."
+  [fstore fkey gkey]
+  (let [known-group? (ha/-groups fstore)]
+    (when-not (known-group? gkey)
+      (throw (ex-info "unknown-group" {:group-key gkey
+                                       :known-groups known-group?}))))
+  (ha/-enable-group! fstore fkey gkey))
+
+(defn disable-group!
+  "Disable a feature for a specific group."
+  [fstore fkey gkey]
+  (ha/-disable-group! fstore fkey gkey))
 
 ;; }}}
 

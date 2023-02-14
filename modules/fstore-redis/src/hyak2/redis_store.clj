@@ -5,6 +5,7 @@
    (It won't work for the expiry and author data; these are hyak
    extensions)."
   (:require
+   [clojure.string   :as string]
    [hyak2.adapter    :as ha]
    [taoensso.carmine :as car :refer [wcar]]))
 
@@ -14,12 +15,22 @@
 (defn- boolean-gate-open? [gate-values]
   (= "true" (get gate-values "boolean")))
 
-(defn- akey->str [akey] (str "actors/" akey))
+(defn- akey->str [akey] (str "actors/" (name (or akey ""))))
 
 (defn- actor-gate-open? [gate-values akey]
-  (= "1" (get gate-values (akey->str akey))))
+  (= "1" (get gate-values (akey->str akey) "")))
 
-(defrecord FeatureStore [root-key carmine-opts]
+(defn- gkey->str [gkey] (str "groups/" (name gkey)))
+
+(defn- str->gkey [s] (as-> s $ (string/replace $ #"^groups/" "") (keyword $)))
+
+(defn- group-gate-open? [group-registry gate-values akey]
+  (let [active? (fn [[k v]] (and (string/starts-with? k "groups/") (= v "1")))
+        gkeys   (into [] (comp (filter active?) (map key)) gate-values)
+        preds   (vals (select-keys group-registry gkeys))]
+    (when-not (empty? preds) ((apply some-fn preds) akey))))
+
+(defrecord FeatureStore [root-key *group-registry carmine-opts]
   ha/IFStore
   (-features [_]
     (set (wcar carmine-opts (car/smembers root-key))))
@@ -40,7 +51,8 @@
   (-enabled? [_ fkey akey]
     (let [gate-values (get-feature carmine-opts fkey)]
       (or (boolean-gate-open? gate-values)
-          (actor-gate-open? gate-values akey))))
+          (actor-gate-open? gate-values akey)
+          (group-gate-open? @*group-registry gate-values akey))))
 
   (-enable! [_ fkey]
     (wcar carmine-opts (car/hset fkey "boolean" "true"))
@@ -52,7 +64,22 @@
 
   (-disable-actor! [_ fkey akey]
     (wcar carmine-opts (car/hdel fkey (akey->str akey)))
-    :disabled-actor))
+    :disabled-actor)
+
+  (-groups [_]
+    (->> @*group-registry keys (map str->gkey) set))
+
+  (-register-group! [_ gkey pred]
+    (swap! *group-registry assoc (gkey->str gkey) pred))
+
+  (-unregister-group! [_ gkey]
+    (swap! *group-registry dissoc (gkey->str gkey)))
+
+  (-enable-group! [_ fkey gkey]
+    (wcar carmine-opts (car/hset fkey (gkey->str gkey) "1")))
+
+  (-disable-group! [_ fkey gkey]
+    (wcar carmine-opts (car/hdel fkey (gkey->str gkey)))))
 
 (defn create-fstore!
   "Create a Redis feature store.
@@ -61,7 +88,7 @@
   ([carmine-opts opts]
    (create-fstore! "flipper_features" carmine-opts opts))
   ([root-key carmine-opts _opts]
-   (->FeatureStore root-key carmine-opts)))
+   (->FeatureStore root-key (atom {}) carmine-opts)))
 
 (defn destroy-fstore!
   "Purge all feature state from the Redis store, leaving other kvs alone."

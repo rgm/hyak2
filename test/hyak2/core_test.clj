@@ -45,7 +45,7 @@
 ;; }}}
 
 (defn add-remove-test []
-  (testing "adding and removing features is idempotent"
+  (testing "adding and removing features are idempotent"
     (let [fkey       (make-fkey "my-new-feature")
           expires-at (.plusMinutes (java.time.LocalDateTime/now) 15)
           author     "ryan@ryanmccuaig.net"]
@@ -64,7 +64,7 @@
     run-with-postgres-store))
 
 (defn boolean-gate-test []
-  (testing "boolean gates work & enable/disable is idempotent"
+  (testing "boolean gates work & enable/disable are idempotent"
     (let [fkey (make-fkey "boolean-feature")]
       (sut/add! *fstore* fkey nil nil)
       (is (not (sut/enabled? *fstore* fkey)))
@@ -96,7 +96,7 @@
          (is (not (sut/enabled? *fstore* fkey nil))))))))
 
 (defn actor-gate-test []
-  (testing "actor gates work & enable/disable is idempotent"
+  (testing "actor gates work & enable/disable are idempotent"
     (let [fkey (make-fkey "actor-feature")
           akey-yep "beta-tester"
           akey-mmhm "beta-tester-2"
@@ -119,6 +119,33 @@
 
 (deftest all-stores-actor-test
   (doto actor-gate-test
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
+
+(defn group-gate-test []
+  (testing "group gates work & enable/disable/reg/dereg are idempotent"
+    (let [fkey      (make-fkey "group-feature")
+          akey-yep  "yep"
+          akey-nope "nope"
+          gkey      :early-access
+          pred      (fn [akey] (= akey akey-yep))]
+      (sut/add! *fstore* fkey nil nil)
+      (is (not (sut/enabled? *fstore* fkey akey-yep)))
+      (is (not (sut/enabled? *fstore* fkey akey-nope)))
+      (dotimes [_ 2]
+        (sut/register-group! *fstore* gkey pred)
+        (is (thrown? Exception (sut/enable-group! *fstore* fkey :unknown-k)))
+        (sut/enable-group! *fstore* fkey gkey)
+        (is (sut/enabled? *fstore* fkey akey-yep))
+        (is (not (sut/enabled? *fstore* fkey akey-nope))))
+      (dotimes [_ 2]
+        (sut/unregister-groups! *fstore*)
+        (is (not (sut/enabled? *fstore* fkey akey-yep)))
+        (is (not (sut/enabled? *fstore* fkey akey-nope)))))))
+
+(deftest all-stores-group-test
+  (doto group-gate-test
     run-with-memory-store
     run-with-redis-store
     run-with-postgres-store))

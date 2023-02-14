@@ -34,4 +34,19 @@
     "Open actor gate on a feature.")
 
   (-disable-actor! [fstore fkey akey]
-    "Close actor gate on a feature."))
+    "Close actor gate on a feature.")
+
+  (-groups [fstore]
+    "List all registered groups.")
+
+  (-register-group! [fstore gkey pred]
+    "Register a group predicate.")
+
+  (-unregister-group! [fstore gkey]
+    "Unregister a group predicate.")
+
+  (-enable-group! [fstore fkey gkey]
+    "Open group gate on a feature for a group key.")
+
+  (-disable-group! [fstore fkey gkey]
+    "Close group gate on a feature for a group key."))
