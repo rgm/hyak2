@@ -12,7 +12,7 @@
   :test
   {:extra-paths ["test"]
    :extra-deps
-   {lambdaisland/kaocha       {:mvn/version "1.76.1230"}
+   {lambdaisland/kaocha       {:mvn/version "1.77.1236"}
     org.clojure/core.async    {:mvn/version "1.6.673"}
     org.slf4j/slf4j-nop       {:mvn/version "2.0.6"}
     rgm/hyak.postgres-adapter {:local/root "modules/fstore-postgres"}
