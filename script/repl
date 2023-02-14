@@ -6,5 +6,5 @@ set -e # stop on error
 cd `dirname $0`/.. # work from project root
 [ -f config.env ] && . config.env
 
-clj -Sdeps '{:deps {nrepl/nrepl {:mvn/version "RELEASE"} cider/cider-nrepl {:mvn/version "RELEASE"}}}' -A:test -M -m nrepl.cmdline --middleware '[cider.nrepl/cider-middleware]' --interactive --color
+clj -Sdeps '{:deps {nrepl/nrepl {:mvn/version "RELEASE"} cider/cider-nrepl {:mvn/version "RELEASE"}}}' -A:dev:test -M -m nrepl.cmdline --middleware '[cider.nrepl/cider-middleware]' --interactive --color
 
