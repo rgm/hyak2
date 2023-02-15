@@ -155,7 +155,14 @@
 
 (defn enable-percentage-of-time!
   "Enable a feature for a random % of calls to `enabled?` Supply a percentage
-   on the interval [1, 99]. Disable for 0 and use the boolean gate for 100."
+   on the interval [1, 99]. Disable for 0 and use the boolean gate for 100.
+
+   Important safety hint: if TTL caching is enabled on the store (eg. with
+   :ttl/threshold) this gate will tend to blend with percentage-of-actors over
+   short intervals. That is, calls to `enabled?` for a given akey will be fixed
+   for the TTL period, so if all the requests over short intervals are coming
+   from one user, this gate will collapse to be equivalent to
+   percentage-of-actors."
   [fstore fkey pct]
   {:pre [(integer? pct) (< 0 pct 100)]}
   (ha/-enable-percentage-of-time! fstore fkey pct))

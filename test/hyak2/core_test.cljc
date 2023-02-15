@@ -177,7 +177,7 @@
 (defn percent-of-time-test []
   (testing "pct-of-time gate works, is idempotent"
     (let [fkey      (make-fkey "pct-of-time-feature")
-          n         1000
+          n         10000
           pct       (inc (rand-int 99))
           n-enabled (fn [] (->> (repeat n "an-akey")
                                 (filter #(sut/enabled? *fstore* fkey %))
@@ -185,7 +185,7 @@
       (sut/add! *fstore* fkey nil nil)
       (is (not (sut/enabled? *fstore* fkey)))
       (sut/enable-percentage-of-time! *fstore* fkey pct)
-      (let [eps (* n 0.10)]
+      (let [eps (* n 0.05)]
         (is (epsilon= eps (* (/ pct 100) n) (n-enabled))))
       (sut/disable-percentage-of-time! *fstore* fkey)
       (is (not (sut/enabled? *fstore* fkey))))))
@@ -194,12 +194,12 @@
   (doto percent-of-time-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    (partial run-with-postgres-store {:ttl/threshold 1500})))
 
 (defn percent-of-actors-test []
   (testing "pct-of-actors gate works, is idempotent"
     (let [fkey      (make-fkey "pct-of-actors-feature")
-          n         1000
+          n         10000
           pct       (inc (rand-int 99))
           akeys     (gen/sample gen/string n)
           n-enabled (fn [akeys] (->> akeys
@@ -208,7 +208,7 @@
       (sut/add! *fstore* fkey nil nil)
       (is (= 0 (n-enabled akeys)))
       (sut/enable-percentage-of-actors! *fstore* fkey pct)
-      (let [eps (* n 0.10)]
+      (let [eps (* n 0.05)]
         (is (epsilon= eps (* (/ pct 100) n) (n-enabled akeys))))
       (sut/disable-percentage-of-actors! *fstore* fkey)
       (is (= 0 (n-enabled akeys))))))
@@ -217,7 +217,7 @@
   (doto percent-of-actors-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    (partial run-with-postgres-store {:ttl/threshold 1500})))
 
 (deftest expired-test
   (doto
