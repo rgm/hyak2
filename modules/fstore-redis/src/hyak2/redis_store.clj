@@ -34,6 +34,10 @@
         preds   (vals (select-keys group-registry gkeys))]
     (when-not (empty? preds) ((apply some-fn preds) akey))))
 
+(defn- pct-of-time-gate-open? [gate-values]
+  (when-let [percent-str (get gate-values "percentage_of_time")]
+    (< (rand) (/ (parse-long percent-str) 100.0))))
+
 (defrecord FeatureStore [root-key *group-registry carmine-opts]
   ha/IFStore
   (-features [_]
@@ -62,7 +66,8 @@
 
   (-enabled? [_ fkey akey]
     (let [gate-values (get-feature carmine-opts fkey)]
-      (or (boolean-gate-open? gate-values)
+      (or (pct-of-time-gate-open? gate-values)
+          (boolean-gate-open? gate-values)
           (actor-gate-open? gate-values akey)
           (group-gate-open? @*group-registry gate-values akey))))
 
@@ -88,7 +93,13 @@
     (wcar carmine-opts (car/hset fkey (gkey->str gkey) "1")))
 
   (-disable-group! [_ fkey gkey]
-    (wcar carmine-opts (car/hdel fkey (gkey->str gkey)))))
+    (wcar carmine-opts (car/hdel fkey (gkey->str gkey))))
+
+  (-enable-percentage-of-time! [_ fkey pct]
+    (wcar carmine-opts (car/hset fkey "percentage_of_time" (str pct))))
+
+  (-disable-percentage-of-time! [_ fkey]
+    (wcar carmine-opts (car/hdel fkey "percentage_of_time"))))
 
 (defn create-fstore!
   "Create a Redis feature store.

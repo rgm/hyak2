@@ -52,4 +52,10 @@
     "Open group gate on a feature for a group key.")
 
   (-disable-group! [fstore fkey gkey]
-    "Close group gate on a feature for a group key."))
+    "Close group gate on a feature for a group key.")
+
+  (-enable-percentage-of-time! [fstore fkey pct]
+    "Open pct-of-time gate for a feature.")
+
+  (-disable-percentage-of-time! [fstore fkey]
+    "Close pct-of-time gate for a feature."))

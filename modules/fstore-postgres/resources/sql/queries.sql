@@ -72,12 +72,18 @@ INSERT INTO :i:gates-table-name
 -- :name hug:delete-gates-for-fkey :! :n
 DELETE FROM :i:gates-table-name WHERE feature_key = :fkey;
 
--- :name hug:delete-gate :! :n
--- :doc Delete one specific gate
+-- :name hug:delete-gate-for-fkey-key-val :! :n
+-- :doc Delete a specific gate given all three cols
 DELETE FROM :i:gates-table-name WHERE
       feature_key = :fkey
   AND key         = :gate-type
   AND value       = :gate-value;
+
+-- :name hug:delete-gate-for-fkey-key :! :n
+-- :doc Delete a specific gate given first two cols
+DELETE FROM :i:gates-table-name WHERE
+      feature_key = :fkey
+  AND key         = :gate-type;
 
 -- :name hug:select-gates-for-fkey :?
 SELECT key, value from :i:gates-table-name WHERE feature_key = :fkey;

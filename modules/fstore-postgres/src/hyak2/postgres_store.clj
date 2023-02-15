@@ -56,7 +56,8 @@
    hug:create-gates-index
    hug:create-gates-table
    hug:delete-feature
-   hug:delete-gate
+   hug:delete-gate-for-fkey-key-val
+   hug:delete-gate-for-fkey-key
    hug:delete-gates-for-fkey
    hug:drop-features-index
    hug:drop-features-table
@@ -134,6 +135,13 @@
     (when-not (empty? active-preds)
       ((apply some-fn active-preds) akey))))
 
+(defn- pct-of-time-gate-open? [gate-values]
+  (when-let [percent-str (some->> gate-values
+                          (filter #(= (:key %) "percentage_of_time"))
+                          first
+                          :value)]
+    (< (rand) (/ (parse-long percent-str) 100.0))))
+
 (defn- enabled?
   "Is the feature enabled for the key?
 
@@ -144,7 +152,8 @@
         params (merge (make-names table-prefix)
                       {:fkey fkey})
         gates (hug:select-gates-for-fkey datasource params)]
-    (or (boolean-gate-open? gates)
+    (or (pct-of-time-gate-open? gates)
+        (boolean-gate-open? gates)
         (actor-gate-open? gates akey)
         (group-gate-open? @(:*group-registry fstore) gates akey))))
 
@@ -203,7 +212,7 @@
                         {:fkey fkey
                          :gate-type "actor"
                          :gate-value akey})]
-      (hug:delete-gate datasource params)))
+      (hug:delete-gate-for-fkey-key-val datasource params)))
 
   (-groups [_]
     (->> @*group-registry keys set))
@@ -226,7 +235,22 @@
                         {:fkey fkey
                          :gate-type "group"
                          :gate-value (name gkey)})]
-      (hug:delete-gate datasource params))))
+      (hug:delete-gate-for-fkey-key-val datasource params)))
+
+  (-enable-percentage-of-time! [_ fkey pct]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "percentage_of_time"
+                         :gate-value (str pct)})]
+      (doto datasource
+        (hug:delete-gate-for-fkey-key params)
+        (hug:insert-gate params))))
+
+  (-disable-percentage-of-time! [_ fkey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "percentage_of_time"})]
+      (hug:delete-gate-for-fkey-key datasource params))))
 
 (defn create-fstore!
   "Create a postgres feature store. By default reuses any existing data in the

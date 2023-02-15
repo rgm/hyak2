@@ -170,6 +170,31 @@
     run-with-redis-store
     run-with-postgres-store))
 
+(defn epsilon= [eps a b] (< (abs (- a b)) eps))
+
+(defn percent-of-time-test []
+  (testing "pct-of-time gate works, is idempotent"
+    (let [fkey (make-fkey "pct-of-time-feature")
+          n 1000
+          pct 57
+          n-enabled (fn []
+                      (->> (repeat n "an-akey")
+                           (filter #(sut/enabled? *fstore* fkey %))
+                           (count)))]
+      (sut/add! *fstore* fkey nil nil)
+      (is (not (sut/enabled? *fstore* fkey)))
+      (sut/enable-percentage-of-time! *fstore* fkey pct)
+      (let [eps (* n 0.05)]
+        (is (epsilon= eps (* (/ pct 100) n) (n-enabled))))
+      (sut/disable-percentage-of-time! *fstore* fkey)
+      (is (not (sut/enabled? *fstore* fkey))))))
+
+(deftest all-store-percent-of-time-test
+  (doto percent-of-time-test
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
+
 (deftest expired-test
   (doto
    #(testing "a feature can be `expired?`"

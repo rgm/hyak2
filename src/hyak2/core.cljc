@@ -147,5 +147,24 @@
   :disabled-group)
 
 ;; }}}
+;; * percent of time gate {{{
+
+;; percent of time gate is random and doesn't depend on akey. If
+;; percent-of-time is 50, then for 100 calls to `enabled?` you should expect
+;; about 50 to come back true. It won't be stable on akey.
+
+(defn enable-percentage-of-time!
+  "Enable a feature for a random % of calls to `enabled?` Supply a percentage
+   on the interval [1, 99]. Disable for 0 and use the boolean gate for 100."
+  [fstore fkey pct]
+  {:pre [(number? pct) (< 0 pct 100)]}
+  (ha/-enable-percentage-of-time! fstore fkey pct))
+
+(defn disable-percentage-of-time!
+  "Disable a feature previously turned on for a percentage of time."
+  [fstore fkey]
+  (ha/-disable-percentage-of-time! fstore fkey))
+
+;; }}}
 
 ;; vi:fdm=marker

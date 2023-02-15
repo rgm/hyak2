@@ -17,6 +17,10 @@
     (when-not (empty? active-preds)
       ((apply some-fn active-preds) akey))))
 
+(defn- pct-of-time-gate-open? [gates fkey]
+  (when-let [pct (get-in gates [fkey :gate/pct-of-time])]
+    (< (rand) (/ pct 100.0))))
+
 (defrecord FeatureStore [*state]
   ha/IFStore
   (-features [_]
@@ -46,7 +50,8 @@
 
   (-enabled? [_ fkey akey]
     (let [gates (:gates @*state)]
-      (or (boolean-gate-open? gates fkey)
+      (or (pct-of-time-gate-open? gates fkey)
+          (boolean-gate-open? gates fkey)
           (actor-gate-open? gates fkey akey)
           ;; group gate can get pricey; do last for OR short-circuit
           (group-gate-open? (:group-registry @*state) gates fkey akey))))
@@ -77,7 +82,13 @@
 
   (-disable-group! [_ fkey gkey]
     (swap! *state #(update-in % [:gates fkey :gate/group]
-                              (fnil disj #{}) gkey))))
+                              (fnil disj #{}) gkey)))
+
+  (-enable-percentage-of-time! [_ fkey pct]
+    (swap! *state #(assoc-in % [:gates fkey :gate/pct-of-time] pct)))
+
+  (-disable-percentage-of-time! [_ fkey]
+    (swap! *state #(update-in % [:gates fkey] dissoc :gate/pct-of-time))))
 
 (defn create-fstore! []
   (let [initial-state {:fkeys #{} :meta {}}]
