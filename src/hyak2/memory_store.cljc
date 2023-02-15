@@ -21,6 +21,19 @@
   (when-let [pct (get-in gates [fkey :gate/pct-of-time])]
     (< (rand) (/ pct 100.0))))
 
+(defn akey->n [akey]
+  #?(:clj  (let [crc (doto (new java.util.zip.CRC32)
+                       (.update (.getBytes akey)))]
+             (.getValue crc))
+     :cljs akey)) ;; TODO implement cljs akey hashing
+
+(defn- pct-of-actors-gate-open? [gates fkey akey]
+  (when-let [pct (get-in gates [fkey :gate/pct-of-actors])]
+    (let [scaling-factor 1000
+          ;; scaling gets us a bit more precision at the boundary
+          n (mod (akey->n akey) (* 100 scaling-factor))]
+      (< n (* pct scaling-factor)))))
+
 (defrecord FeatureStore [*state]
   ha/IFStore
   (-features [_]
@@ -51,6 +64,7 @@
   (-enabled? [_ fkey akey]
     (let [gates (:gates @*state)]
       (or (pct-of-time-gate-open? gates fkey)
+          (pct-of-actors-gate-open? gates fkey akey)
           (boolean-gate-open? gates fkey)
           (actor-gate-open? gates fkey akey)
           ;; group gate can get pricey; do last for OR short-circuit
@@ -88,7 +102,13 @@
     (swap! *state #(assoc-in % [:gates fkey :gate/pct-of-time] pct)))
 
   (-disable-percentage-of-time! [_ fkey]
-    (swap! *state #(update-in % [:gates fkey] dissoc :gate/pct-of-time))))
+    (swap! *state #(update-in % [:gates fkey] dissoc :gate/pct-of-time)))
+
+  (-enable-percentage-of-actors! [_ fkey pct]
+    (swap! *state #(assoc-in % [:gates fkey :gate/pct-of-actors] pct)))
+
+  (-disable-percentage-of-actors! [_ fkey]
+    (swap! *state #(update-in % [:gates fkey] dissoc :gate/pct-of-actors))))
 
 (defn create-fstore! []
   (let [initial-state {:fkeys #{} :meta {}}]

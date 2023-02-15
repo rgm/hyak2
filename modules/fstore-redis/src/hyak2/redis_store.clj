@@ -38,6 +38,17 @@
   (when-let [percent-str (get gate-values "percentage_of_time")]
     (< (rand) (/ (parse-long percent-str) 100.0))))
 
+(defn akey->n [akey]
+  (let [crc (doto (new java.util.zip.CRC32)
+              (.update (.getBytes akey)))]
+    (.getValue crc)))
+
+(defn pct-of-actors-gate-open? [gate-values akey]
+  (when-let [percent (get gate-values "percentage_of_actors")]
+    (let [scaling-factor 1000 ;; gives us a few more decimal places
+          n (mod (akey->n akey) (* 100 scaling-factor))]
+      (< n (* (parse-long percent) scaling-factor)))))
+
 (defrecord FeatureStore [root-key *group-registry carmine-opts]
   ha/IFStore
   (-features [_]
@@ -67,6 +78,7 @@
   (-enabled? [_ fkey akey]
     (let [gate-values (get-feature carmine-opts fkey)]
       (or (pct-of-time-gate-open? gate-values)
+          (pct-of-actors-gate-open? gate-values akey)
           (boolean-gate-open? gate-values)
           (actor-gate-open? gate-values akey)
           (group-gate-open? @*group-registry gate-values akey))))
@@ -99,7 +111,13 @@
     (wcar carmine-opts (car/hset fkey "percentage_of_time" (str pct))))
 
   (-disable-percentage-of-time! [_ fkey]
-    (wcar carmine-opts (car/hdel fkey "percentage_of_time"))))
+    (wcar carmine-opts (car/hdel fkey "percentage_of_time")))
+
+  (-enable-percentage-of-actors! [_ fkey pct]
+    (wcar carmine-opts (car/hset fkey "percentage_of_actors" (str pct))))
+
+  (-disable-percentage-of-actors! [_ fkey]
+    (wcar carmine-opts (car/hdel fkey "percentage_of_actors"))))
 
 (defn create-fstore!
   "Create a Redis feature store.

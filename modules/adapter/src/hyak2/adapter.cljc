@@ -58,4 +58,10 @@
     "Open pct-of-time gate for a feature.")
 
   (-disable-percentage-of-time! [fstore fkey]
-    "Close pct-of-time gate for a feature."))
+    "Close pct-of-time gate for a feature.")
+
+  (-enable-percentage-of-actors! [fstore fkey pct]
+    "Open pct-of-actors gate for a feature.")
+
+  (-disable-percentage-of-actors! [fstore fkey]
+    "Close pct-of-actors gate for a feature."))

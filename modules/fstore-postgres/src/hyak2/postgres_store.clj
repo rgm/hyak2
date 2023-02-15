@@ -137,10 +137,24 @@
 
 (defn- pct-of-time-gate-open? [gate-values]
   (when-let [percent-str (some->> gate-values
-                          (filter #(= (:key %) "percentage_of_time"))
-                          first
-                          :value)]
+                                  (filter #(= (:key %) "percentage_of_time"))
+                                  first
+                                  :value)]
     (< (rand) (/ (parse-long percent-str) 100.0))))
+
+(defn akey->n [akey]
+  (let [crc (doto (new java.util.zip.CRC32)
+              (.update (.getBytes akey)))]
+    (.getValue crc)))
+
+(defn pct-of-actors-gate-open? [gate-values akey]
+  (when-let [percent-str (some->> gate-values
+                                  (filter #(= (:key %) "percentage_of_actors"))
+                                  first
+                                  :value)]
+    (let [scaling-factor 1000 ;; gives us a few more decimal places
+          n (mod (akey->n akey) (* 100 scaling-factor))]
+      (< n (* (parse-long percent-str) scaling-factor)))))
 
 (defn- enabled?
   "Is the feature enabled for the key?
@@ -153,6 +167,7 @@
                       {:fkey fkey})
         gates (hug:select-gates-for-fkey datasource params)]
     (or (pct-of-time-gate-open? gates)
+        (pct-of-actors-gate-open? gates akey)
         (boolean-gate-open? gates)
         (actor-gate-open? gates akey)
         (group-gate-open? @(:*group-registry fstore) gates akey))))
@@ -250,6 +265,21 @@
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
                          :gate-type "percentage_of_time"})]
+      (hug:delete-gate-for-fkey-key datasource params)))
+
+  (-enable-percentage-of-actors! [_ fkey pct]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "percentage_of_actors"
+                         :gate-value (str pct)})]
+      (doto datasource
+        (hug:delete-gate-for-fkey-key params)
+        (hug:insert-gate params))))
+
+  (-disable-percentage-of-actors! [_ fkey]
+    (let [params (merge (make-names table-prefix)
+                        {:fkey fkey
+                         :gate-type "percentage_of_actors"})]
       (hug:delete-gate-for-fkey-key datasource params))))
 
 (defn create-fstore!

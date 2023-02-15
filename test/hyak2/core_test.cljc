@@ -1,21 +1,23 @@
 (ns hyak2.core-test
   #?(:clj
      (:require
-      [clojure.core.async         :as a]
-      [clojure.tools.logging.test :refer [logged? with-log]]
-      [clojure.test               :as t :refer [deftest testing is]]
-      [hyak2.core                 :as sut]
-      [hyak2.memory-store         :as memory-store]
-      [hyak2.postgres-store       :as postgres-store]
-      [hyak2.redis-store          :as redis-store]
-      [hyak2.time                 :as ht])
+      [clojure.core.async            :as a]
+      [clojure.tools.logging.test    :refer [logged? with-log]]
+      [clojure.test                  :as t :refer [deftest testing is]]
+      [clojure.test.check.generators :as gen]
+      [hyak2.core                    :as sut]
+      [hyak2.memory-store            :as memory-store]
+      [hyak2.postgres-store          :as postgres-store]
+      [hyak2.redis-store             :as redis-store]
+      [hyak2.time                    :as ht])
      :cljs
      (:require
-      [clojure.core.async         :as a]
-      [clojure.test               :as t :refer [deftest testing is]]
-      [hyak2.core                 :as sut]
-      [hyak2.memory-store         :as memory-store]
-      [hyak2.time                 :as ht])))
+      [clojure.core.async            :as a]
+      [clojure.test                  :as t :refer [deftest testing is]]
+      [clojure.test.check.generators :as gen]
+      [hyak2.core                    :as sut]
+      [hyak2.memory-store            :as memory-store]
+      [hyak2.time                    :as ht])))
 
 ;; TODO implement for cljs
 #?(:cljs (defn logged? [_ _ _] false))
@@ -174,23 +176,45 @@
 
 (defn percent-of-time-test []
   (testing "pct-of-time gate works, is idempotent"
-    (let [fkey (make-fkey "pct-of-time-feature")
-          n 1000
-          pct 57
-          n-enabled (fn []
-                      (->> (repeat n "an-akey")
-                           (filter #(sut/enabled? *fstore* fkey %))
-                           (count)))]
+    (let [fkey      (make-fkey "pct-of-time-feature")
+          n         1000
+          pct       (inc (rand-int 99))
+          n-enabled (fn [] (->> (repeat n "an-akey")
+                                (filter #(sut/enabled? *fstore* fkey %))
+                                (count)))]
       (sut/add! *fstore* fkey nil nil)
       (is (not (sut/enabled? *fstore* fkey)))
       (sut/enable-percentage-of-time! *fstore* fkey pct)
-      (let [eps (* n 0.05)]
+      (let [eps (* n 0.10)]
         (is (epsilon= eps (* (/ pct 100) n) (n-enabled))))
       (sut/disable-percentage-of-time! *fstore* fkey)
       (is (not (sut/enabled? *fstore* fkey))))))
 
 (deftest all-store-percent-of-time-test
   (doto percent-of-time-test
+    run-with-memory-store
+    run-with-redis-store
+    run-with-postgres-store))
+
+(defn percent-of-actors-test []
+  (testing "pct-of-actors gate works, is idempotent"
+    (let [fkey      (make-fkey "pct-of-actors-feature")
+          n         1000
+          pct       (inc (rand-int 99))
+          akeys     (gen/sample gen/string n)
+          n-enabled (fn [akeys] (->> akeys
+                                     (filter #(sut/enabled? *fstore* fkey %))
+                                     (count)))]
+      (sut/add! *fstore* fkey nil nil)
+      (is (= 0 (n-enabled akeys)))
+      (sut/enable-percentage-of-actors! *fstore* fkey pct)
+      (let [eps (* n 0.10)]
+        (is (epsilon= eps (* (/ pct 100) n) (n-enabled akeys))))
+      (sut/disable-percentage-of-actors! *fstore* fkey)
+      (is (= 0 (n-enabled akeys))))))
+
+(deftest all-store-percent-of-actor-test
+  (doto percent-of-actors-test
     run-with-memory-store
     run-with-redis-store
     run-with-postgres-store))

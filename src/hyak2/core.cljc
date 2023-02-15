@@ -157,13 +157,27 @@
   "Enable a feature for a random % of calls to `enabled?` Supply a percentage
    on the interval [1, 99]. Disable for 0 and use the boolean gate for 100."
   [fstore fkey pct]
-  {:pre [(number? pct) (< 0 pct 100)]}
+  {:pre [(integer? pct) (< 0 pct 100)]}
   (ha/-enable-percentage-of-time! fstore fkey pct))
 
 (defn disable-percentage-of-time!
   "Disable a feature previously turned on for a percentage of time."
   [fstore fkey]
   (ha/-disable-percentage-of-time! fstore fkey))
+
+;; }}}
+;; * percent of actors gate {{{
+
+;; percent of actors gate is stable for a given actor, ie. the specific set of
+;; actors is random (based on hashing the akey to a number between 0 and 100).
+;; The result of `enabled?` will be stable given the same akey.
+
+(defn enable-percentage-of-actors! [fstore fkey pct]
+  {:pre [(integer? pct) (< 0 pct 100)]}
+  (ha/-enable-percentage-of-actors! fstore fkey pct))
+
+(defn disable-percentage-of-actors! [fstore fkey]
+  (ha/-disable-percentage-of-actors! fstore fkey))
 
 ;; }}}
 
