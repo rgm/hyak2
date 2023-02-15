@@ -1,5 +1,5 @@
-(ns hyak2.time
-  "Encapsulate clj/cljs time handling differences."
+(ns hyak2.platform
+  "Isolate platform-specific code."
   (:import [java.time LocalDateTime]))
 
 (defn now []
@@ -13,3 +13,9 @@
   "Compare 2 Java LocalDateTimes."
   [a b]
   (and a b (.isBefore a b)))
+
+(defn akey->n [akey]
+  (let [crc (doto (new java.util.zip.CRC32)
+              (.update (.getBytes akey)))]
+    (.getValue crc)))
+

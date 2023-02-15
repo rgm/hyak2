@@ -1,7 +1,7 @@
-(ns hyak2.time-test
+(ns hyak2.platform-test
   (:require
-   [clojure.test :as t :refer [deftest is]]
-   [hyak2.time   :as sut]))
+   [clojure.test   :as t :refer [deftest is]]
+   [hyak2.platform :as sut]))
 
 (deftest before?-test
   ;; ugh dates are easy to mess up, esp w nils

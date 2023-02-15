@@ -1,4 +1,5 @@
-(ns hyak2.time)
+(ns hyak2.platform
+  "Isolate platform-specific code.")
 
 (defn now []
   (js/Date.))
@@ -11,3 +12,7 @@
   "Compare two JavaScript `Date` objects."
   [a b]
   (< a b))
+
+(defn akey->n [akey]
+  ;; TODO implement this
+  akey)

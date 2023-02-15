@@ -8,8 +8,8 @@
   "
   (:require
    #?(:clj [clojure.tools.logging :refer [warn]])
-   [hyak2.adapter :as ha]
-   [hyak2.time    :as ht]))
+   [hyak2.adapter  :as ha]
+   [hyak2.platform :as hp]))
 
 ;; DRAMATIS PERSONAE:
 ;; fstore .................... Feature Store
@@ -29,18 +29,18 @@
 (defn stale?
   "Does the fstore contain any expired features?"
   ([fstore]
-   (stale? fstore (ht/now)))
+   (stale? fstore (hp/now)))
   ([fstore now]
    (some->> (ha/-features fstore)
             (map :expires-at)
-            (filter #(ht/before? % now))
+            (filter #(hp/before? % now))
             seq
             boolean)))
 
 (defn add!
   "Add a feature."
   ([fstore fkey]
-   (add! fstore fkey (ht/default-expires-at) nil))
+   (add! fstore fkey (hp/default-expires-at) nil))
   ([fstore fkey expires-at]
    (add! fstore fkey expires-at nil))
   ([fstore fkey expires-at author]
@@ -55,7 +55,7 @@
 
 (defn expired?
   "Has the feature expired?"
-  ([fstore fkey] (expired? fstore fkey (ht/now)))
+  ([fstore fkey] (expired? fstore fkey (hp/now)))
   ([fstore fkey now] (ha/-expired? fstore fkey now)))
 
 (defn disable!

@@ -1,7 +1,7 @@
 (ns hyak2.memory-store
   (:require
-   [hyak2.adapter :as ha]
-   [hyak2.time    :as ht]))
+   [hyak2.adapter  :as ha]
+   [hyak2.platform :as hp]))
 
 (defn- boolean-gate-open? [gates fkey]
   (boolean (get-in gates [fkey :gate/boolean])))
@@ -21,17 +21,11 @@
   (when-let [pct (get-in gates [fkey :gate/pct-of-time])]
     (< (rand) (/ pct 100.0))))
 
-(defn akey->n [akey]
-  #?(:clj  (let [crc (doto (new java.util.zip.CRC32)
-                       (.update (.getBytes akey)))]
-             (.getValue crc))
-     :cljs akey)) ;; TODO implement cljs akey hashing
-
 (defn- pct-of-actors-gate-open? [gates fkey akey]
   (when-let [pct (get-in gates [fkey :gate/pct-of-actors])]
     (let [scaling-factor 1000
           ;; scaling gets us a bit more precision at the boundary
-          n (mod (akey->n akey) (* 100 scaling-factor))]
+          n (mod (hp/akey->n akey) (* 100 scaling-factor))]
       (< n (* pct scaling-factor)))))
 
 (defrecord FeatureStore [*state]
@@ -55,7 +49,7 @@
 
   (-expired? [_ fkey now]
     (let [expires-at (get-in @*state [:meta fkey :expires-at])]
-      (ht/before? expires-at now)))
+      (hp/before? expires-at now)))
 
   (-disable! [_ fkey]
     ;; "disabled" means just having no gates at all for the fkey

@@ -7,7 +7,7 @@
   (:require
    [clojure.string   :as string]
    [hyak2.adapter    :as ha]
-   [hyak2.time       :as ht]
+   [hyak2.platform   :as hp]
    [taoensso.carmine :as car :refer [wcar]]))
 
 (defn- get-feature [carmine-opts fkey]
@@ -38,15 +38,10 @@
   (when-let [percent-str (get gate-values "percentage_of_time")]
     (< (rand) (/ (parse-long percent-str) 100.0))))
 
-(defn akey->n [akey]
-  (let [crc (doto (new java.util.zip.CRC32)
-              (.update (.getBytes akey)))]
-    (.getValue crc)))
-
 (defn pct-of-actors-gate-open? [gate-values akey]
   (when-let [percent (get gate-values "percentage_of_actors")]
     (let [scaling-factor 1000 ;; gives us a few more decimal places
-          n (mod (akey->n akey) (* 100 scaling-factor))]
+          n (mod (hp/akey->n akey) (* 100 scaling-factor))]
       (< n (* (parse-long percent) scaling-factor)))))
 
 (defrecord FeatureStore [root-key *group-registry carmine-opts]
@@ -70,7 +65,7 @@
 
   (-expired? [_ fkey now]
     (let [metadata (wcar carmine-opts (car/get (fkey->meta-key fkey)))]
-      (ht/before? (:expires-at metadata) now)))
+      (hp/before? (:expires-at metadata) now)))
 
   (-disable! [_ fkey]
     (wcar carmine-opts (car/del fkey)))

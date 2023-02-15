@@ -14,7 +14,7 @@
    [hugsql.adapter.next-jdbc]
    [hugsql.core          :as hugsql]
    [hyak2.adapter        :as ha]
-   [hyak2.time           :as ht]
+   [hyak2.platform       :as hp]
    [next.jdbc])
   (:import
    (java.time Instant LocalDateTime ZoneOffset)))
@@ -142,18 +142,13 @@
                                   :value)]
     (< (rand) (/ (parse-long percent-str) 100.0))))
 
-(defn akey->n [akey]
-  (let [crc (doto (new java.util.zip.CRC32)
-              (.update (.getBytes akey)))]
-    (.getValue crc)))
-
 (defn pct-of-actors-gate-open? [gate-values akey]
   (when-let [percent-str (some->> gate-values
                                   (filter #(= (:key %) "percentage_of_actors"))
                                   first
                                   :value)]
     (let [scaling-factor 1000 ;; gives us a few more decimal places
-          n (mod (akey->n akey) (* 100 scaling-factor))]
+          n (mod (hp/akey->n akey) (* 100 scaling-factor))]
       (< n (* (parse-long percent-str) scaling-factor)))))
 
 (defn- enabled?
@@ -199,7 +194,7 @@
   (-expired? [_ fkey now]
     (let [params  (merge (make-names table-prefix) {:fkey fkey})
           feature (some-> (hug:select-feature datasource params) feature-row->feature)]
-      (ht/before? (:expires-at feature) now)))
+      (hp/before? (:expires-at feature) now)))
 
   (-disable! [_ fkey]
     (let [params (merge (make-names table-prefix) {:fkey fkey})]

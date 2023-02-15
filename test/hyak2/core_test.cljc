@@ -9,7 +9,7 @@
       [hyak2.memory-store            :as memory-store]
       [hyak2.postgres-store          :as postgres-store]
       [hyak2.redis-store             :as redis-store]
-      [hyak2.time                    :as ht])
+      [hyak2.platform                :as hp])
      :cljs
      (:require
       [clojure.core.async            :as a]
@@ -17,7 +17,7 @@
       [clojure.test.check.generators :as gen]
       [hyak2.core                    :as sut]
       [hyak2.memory-store            :as memory-store]
-      [hyak2.time                    :as ht])))
+      [hyak2.platform                :as hp])))
 
 ;; TODO implement for cljs
 #?(:cljs (defn logged? [_ _ _] false))
@@ -66,7 +66,7 @@
 (defn add-remove-test []
   (testing "adding and removing features are idempotent"
     (let [fkey       (make-fkey "my-new-feature")
-          expires-at (.plusMinutes (ht/now) 15)
+          expires-at (.plusMinutes (hp/now) 15)
           author     "ryan@ryanmccuaig.net"]
       (is (not (sut/feature-exists? *fstore* fkey)))
       (dotimes [_ 2]
@@ -223,7 +223,7 @@
   (doto
    #(testing "a feature can be `expired?`"
       (let [fkey (make-fkey "my-expired-feature")
-            now  (ht/now)
+            now  (hp/now)
             past (.minusHours now 1)
             fut  (.plusHours now 1)]
         (sut/add! *fstore* fkey past)
@@ -237,7 +237,7 @@
 (defn stale-fstore-test []
   (testing "an `expires-at` in the past means fstore is `stale?` and noisy"
     (let [fkey (make-fkey "expired-feature")
-          now  (ht/now)
+          now  (hp/now)
           past (.minusHours now 1)
           fut  (.plusHours now 1)]
       (is (not (sut/stale? *fstore* now)))
