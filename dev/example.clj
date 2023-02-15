@@ -1,46 +1,5 @@
-# Hyak
+(ns example)
 
-```
-    ~                           ~              ~
-       ~~~~     ~          ~~ ~        ~      ~    ~~
-  ~~             ,-''-.     ~~        .-.       ~  ~~~
-            ,---':::::::\`.            \_::`.,...__    ~
-     ~     |::`.:::::::::::`.       ~    )::::::.--'
-           |:_:::`.::::::::::`-.__~____,'::::(
- ~~~~       \```-:::`-.o:::::::::\:::::::::~::\       ~~~
-             )` `` `.::::::::::::|:~~:::::::::|      ~   ~~
- ~~        ,',' ` `` \::::::::,-/:_:::::::~~:/
-         ,','/` ,' ` `\::::::|,'   `::~~::::/  ~~        ~
-~       ( (  \_ __,.-' \:-:,-'.__.-':::::::'  ~    ~
-    ~    \`---''   __..--' `:::~::::::_:-'
-          `------''      ~~  \::~~:::'
-       ~~   `--..__  ~   ~   |::_:-'                    ~~~
-   ~ ~~     /:,'   `''---.,--':::\          ~~       ~~
-  ~         ``           (:::::::|  ~~~            ~~    ~
-~~      ~~             ~  \:~~~:::             ~       ~~~
-             ~     ~~~     \:::~::          ~~~     ~
-    ~~           ~~    ~~~  ::::::                     ~~
-          ~~~                \::::   ~~
-                       ~   ~~ `--'
-```
-
-A drop-in Clojure adaptation of [Flipper][flipper] for feature flagging.
-
-Pete Hodgson has a [great overview][hodgson] of why you should consider using
-feature flags, and how not to get burned by them.
-
-![CI](https://github.com/rgm/hyak2/workflows/CI/badge.svg)
-
-Respects Flipper's Redis and Postgres data store implementations, so that you
-can still use the existing Ruby admin web UI and API to manage the feature
-store.
-
-[flipper]: https://github.com/jnunemaker/flipper
-[hodgson]: https://www.martinfowler.com/articles/feature-toggles.html
-
-## Usage
-
-```clojure
 (require '[hyak2.core :as hyak])
 (require '[hyak2.memory-store :as mem]) ;; or redis-store, or postgres-store
 
@@ -127,4 +86,3 @@ store.
 (hyak/enabled? fstore MY-FEATURE-FLAG enabled-actor)     ;; => false
 (hyak/enabled? fstore MY-FEATURE-FLAG disabled-actor)    ;; => false
 (hyak/enabled? fstore MY-FEATURE-FLAG in-group-actor)    ;; => true
-```

@@ -71,7 +71,7 @@
   ([fstore fkey akey]
    (when (expired? fstore fkey)
      (warn (str "feature \"" fkey "\" has expired")))
-   (ha/-enabled? fstore fkey akey)))
+   (boolean (ha/-enabled? fstore fkey akey))))
 
 ;; * boolean gate {{{
 
