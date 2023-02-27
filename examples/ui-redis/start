@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+IFS=$'\n\t'
+if [[ "${TRACE-0}" == "1" ]]; then
+  set -o xtrace
+fi
+
+export FLIPPER_BANNER="hyak2 ui-redis example"
+export FLIPPER_COLOR="primary"
+export REDIS_URL="redis://localhost:6379/1"
+export REDIS_PASSWORD="someredispassword"
+export SESSION_SECRET=$(head -c20 /dev/urandom | base64)
+
+(sleep 1; open "http://localhost:9292") & # open web UI 1s after launch
+
+bundle exec rackup config.ru -p 9292
