@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+IFS=$'\n\t'
+if [[ "${TRACE-0}" == "1" ]]; then
+  set -o xtrace
+fi
+
+export FLIPPER_BANNER="hyak2 ui-postgres example"
+export FLIPPER_COLOR="primary"
+export DATABASE_URL="postgres://localhost:5432/hyak_test"
+export HYAK_TABLE_PREFIX="scratch_"
+export SESSION_SECRET=$(head -c20 /dev/urandom | base64)
+
+(sleep 1; open "http://localhost:9292") & # open web UI 1s after launch
+
+bundle exec rackup config.ru -p 9292

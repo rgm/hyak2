@@ -1,0 +1,44 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    concurrent-ruby (1.2.2)
+    crass (1.0.6)
+    erubi (1.12.0)
+    flipper (0.26.0)
+      concurrent-ruby (< 2)
+    flipper-sequel (0.26.0)
+      flipper (~> 0.26.0)
+      sequel (>= 4.0.0, < 6)
+    flipper-ui (0.26.0)
+      erubi (>= 1.0.0, < 2.0.0)
+      flipper (~> 0.26.0)
+      rack (>= 1.4, < 3)
+      rack-protection (>= 1.5.3, <= 4.0.0)
+      sanitize (< 7)
+    nokogiri (1.14.2-arm64-darwin)
+      racc (~> 1.4)
+    pg (1.4.6)
+    racc (1.6.2)
+    rack (2.2.6.2)
+    rack-protection (3.0.5)
+      rack
+    sanitize (6.0.1)
+      crass (~> 1.0.2)
+      nokogiri (>= 1.12.0)
+    sequel (5.65.0)
+    webrick (1.8.1)
+
+PLATFORMS
+  arm64-darwin-21
+
+DEPENDENCIES
+  flipper
+  flipper-sequel
+  flipper-ui
+  pg
+  rack
+  sequel
+  webrick
+
+BUNDLED WITH
+   2.3.15
