@@ -121,12 +121,12 @@
 (defn actor-gate-open? [gates akey]
   (->> gates
        (filter #(= (select-keys % [:key :value])
-                   {:key "actor" :value akey}))
+                   {:key "actors" :value akey}))
        seq boolean))
 
 (defn group-gate-open? [group-registry gates akey]
   (let [active-group? (->> gates
-                           (filter #(= (:key %) "group"))
+                           (filter #(= (:key %) "groups"))
                            (map :value)
                            (map keyword)
                            (into #{}))
@@ -213,14 +213,14 @@
   (-enable-actor! [_ fkey akey]
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
-                         :gate-type "actor"
+                         :gate-type "actors"
                          :gate-value akey})]
       (hug:insert-gate datasource params)))
 
   (-disable-actor! [_ fkey akey]
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
-                         :gate-type "actor"
+                         :gate-type "actors"
                          :gate-value akey})]
       (hug:delete-gate-for-fkey-key-val datasource params)))
 
@@ -236,14 +236,14 @@
   (-enable-group! [_ fkey gkey]
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
-                         :gate-type "group"
+                         :gate-type "groups"
                          :gate-value (name gkey)})]
       (hug:insert-gate datasource params)))
 
   (-disable-group! [_ fkey gkey]
     (let [params (merge (make-names table-prefix)
                         {:fkey fkey
-                         :gate-type "group"
+                         :gate-type "groups"
                          :gate-value (name gkey)})]
       (hug:delete-gate-for-fkey-key-val datasource params)))
 
