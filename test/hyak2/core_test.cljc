@@ -34,7 +34,7 @@
 ;; leaning on the `testing` macro outside of deftests useful:
 ;; https://stackoverflow.com/a/31766419/53790
 
-(def ^:dynamic *fstore*)
+(def ^:dynamic *fstore* nil)
 
 (defn run-with-memory-store [test-fn]
   (binding [*fstore* (memory-store/create-fstore!)]
