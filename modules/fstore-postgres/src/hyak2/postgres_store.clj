@@ -9,12 +9,13 @@
    highly cacheable, there is optional caching provided by clojure.core.memoize
    to reduce the load on the database."
   (:require
-   [clojure.core.memoize :as memo]
-   [clojure.data.json    :as json]
+   [clojure.core.memoize  :as memo]
+   [clojure.data.json     :as json]
+   [clojure.tools.logging :refer [warn]]
    [hugsql.adapter.next-jdbc]
-   [hugsql.core          :as hugsql]
-   [hyak2.adapter        :as ha]
-   [hyak2.platform       :as hp]
+   [hugsql.core           :as hugsql]
+   [hyak2.adapter         :as ha]
+   [hyak2.platform        :as hp]
    [next.jdbc])
   (:import
    (java.time Instant LocalDateTime ZoneOffset)))
@@ -31,20 +32,43 @@
     (let [inst (Instant/parse s)]
       (LocalDateTime/ofInstant inst ZoneOffset/UTC))))
 
+(defn- decode-feature-meta
+  "Decode metadata off a feature-row, return as a map. The adapter may or may
+   not have set up auto-deserialization of the JSON metadata column.
+
+   See https://cljdoc.org/d/com.github.seancorfield/next.jdbc/1.3.1002/doc/getting-started/tips-tricks#working-with-json-and-jsonb"
+  [feature-row]
+  (let [raw-meta (:metadata feature-row)]
+    (try
+      (cond
+        (map? raw-meta) ;; has already been decoded by something earlier on
+        raw-meta
+
+        (instance? org.postgresql.util.PGobject raw-meta) ;; is still a PGobject
+        (json/read-str (.getValue raw-meta) :key-fn keyword)
+
+        (string? raw-meta)
+        (json/read-str raw-meta :key-fn keyword)
+
+        :else
+        (throw (ex-info "metadata decoding failure" {:feature-row feature-row})))
+      (catch Exception ex
+        (warn (ex-message ex))
+        {}))))
+
 (defn- feature-row->feature
   "Flatten an {:fkey :metadata} row into a flat map with expires-at parsed.
 
    Just decodes JSON manually (instead of setting up auto-convert via
    next.jdbc) so we don't mess with library consumers. "
-  [feature-row]
-  (let [raw-meta (.getValue (:metadata feature-row))
-        metadata (json/read-str raw-meta :key-fn keyword)
-        ?expires-at (:expires-at metadata)]
-    (if ?expires-at
-      (let [expires-at (string->ldt ?expires-at)]
-        (merge metadata {:fkey (:fkey feature-row)
-                         :expires-at expires-at}))
-      (merge metadata {:fkey (:fkey feature-row)}))))
+  ([feature-row]
+   (let [metadata (decode-feature-meta feature-row)
+         ?expires-at (:expires-at metadata)]
+     (if ?expires-at
+       (let [expires-at (string->ldt ?expires-at)]
+         (merge metadata {:fkey (:fkey feature-row)
+                          :expires-at expires-at}))
+       (merge metadata {:fkey (:fkey feature-row)})))))
 
 (let [opts {:adapter (hugsql.adapter.next-jdbc/hugsql-adapter-next-jdbc)
             :quoting :ansi}]

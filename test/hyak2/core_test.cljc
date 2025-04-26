@@ -9,7 +9,8 @@
       [hyak2.memory-store            :as memory-store]
       [hyak2.postgres-store          :as postgres-store]
       [hyak2.redis-store             :as redis-store]
-      [hyak2.platform                :as hp])
+      [hyak2.platform                :as hp]
+      [hyak2.test-helpers.psql       :as test.psql])
      :cljs
      (:require
       [clojure.core.async            :as a]
@@ -38,28 +39,52 @@
 
 (defn run-with-memory-store [test-fn]
   (binding [*fstore* (memory-store/create-fstore!)]
-    (test-fn)))
+    (testing "[memory-store]:"
+      (test-fn))))
 
-#?(:clj (defn run-with-redis-store [test-fn]
-          (let [fstore (redis-store/create-fstore!
-                        "hyak-core2-test"
-                        {:spec {:uri (System/getenv "REDIS_URL")}}
-                        {:clean? true})]
-            (binding [*fstore* fstore]
-              (test-fn))
-            (redis-store/destroy-fstore! fstore)))
+#?(:clj  (defn run-with-redis-store [test-fn]
+           (let [fstore (redis-store/create-fstore!
+                         "hyak-core2-test"
+                         {:spec {:uri (System/getenv "REDIS_URL")}}
+                         {:clean? true})]
+             (binding [*fstore* fstore]
+               (testing "[redis store]:"
+                 (test-fn)))
+             (redis-store/destroy-fstore! fstore)))
    :cljs (defn run-with-redis-store [_]))
 
-#? (:clj (defn run-with-postgres-store
+#?(:clj  (defn run-with-bare-postgres-store
+           ;; this datasource isn't set up for JSON serialization/deserialization
+           ;; so the hyak adapter does its own internal serialization
            ([test-fn]
-            (run-with-postgres-store {:recreate-tables? true} test-fn))
+            (run-with-bare-postgres-store {:recreate-tables? true}
+                                          test-fn))
            ([fstore-opts test-fn]
             (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
-                  prefix   "hyak_core2_test_"
+                  prefix   "hyak_core2_bare_test_"
                   fstore   (postgres-store/create-fstore! prefix jdbc-url fstore-opts)]
-              (binding [*fstore* fstore]
-                (test-fn)))))
-    :cljs (defn run-with-postgres-store ([_]) ([_ _])))
+              (binding [*fstore* fstore
+                        test.psql/*use-psql-auto-serialization?* false]
+                (testing "[psql bare store]:"
+                  (test-fn))))))
+   :cljs (defn run-with-bare-postgres-store ([_]) ([_ _])))
+
+#?(:clj  (defn run-with-jsonifying-postgres-store
+           ;; this datasource has been rigged to serialize/deserialize JSON
+           ;; so the hyak adapter can presume it's handled by the datasource
+           ([test-fn]
+            (run-with-jsonifying-postgres-store {:recreate-tables? true
+                                                 :disable-serialization? true}
+                                                test-fn))
+           ([fstore-opts test-fn]
+            (let [jdbc-url (System/getenv "JDBC_DATABASE_URL")
+                  prefix   "hyak_core2_json_test_"
+                  fstore   (postgres-store/create-fstore! prefix jdbc-url fstore-opts)]
+              (binding [*fstore* fstore
+                        test.psql/*use-psql-auto-serialization?* true]
+                (testing "[psql json store]:"
+                  (test-fn))))))
+   :cljs (defn run-with-jsonifying-postgres-store ([_]) ([_ _])))
 
 ;; }}}
 
@@ -81,7 +106,8 @@
   (doto add-remove-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    run-with-bare-postgres-store
+    run-with-jsonifying-postgres-store))
 
 (defn boolean-gate-test []
   (testing "boolean gates work & enable/disable are idempotent"
@@ -99,10 +125,11 @@
   (doto boolean-gate-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    run-with-bare-postgres-store
+    run-with-jsonifying-postgres-store))
 
 (deftest postgres-caching-test
-  (run-with-postgres-store
+  (run-with-bare-postgres-store
    {:recreate-tables? true :ttl/threshold 50}
    (fn []
      (testing "postgres can cache feature tests"
@@ -142,7 +169,8 @@
   (doto actor-gate-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    run-with-bare-postgres-store
+    run-with-jsonifying-postgres-store))
 
 (defn group-gate-test []
   (testing "group gates work & enable/disable/reg/dereg are idempotent"
@@ -170,7 +198,8 @@
   (doto group-gate-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    run-with-bare-postgres-store
+    run-with-jsonifying-postgres-store))
 
 (defn epsilon= [eps a b] (< (abs (- a b)) eps))
 
@@ -194,7 +223,8 @@
   (doto percent-of-time-test
     run-with-memory-store
     run-with-redis-store
-    (partial run-with-postgres-store {:ttl/threshold 1500})))
+    (partial run-with-bare-postgres-store {:ttl/threshold 1500})
+    (partial run-with-jsonifying-postgres-store {:ttl/threshold 1500})))
 
 (defn percent-of-actors-test []
   (testing "pct-of-actors gate works, is idempotent"
@@ -217,7 +247,8 @@
   (doto percent-of-actors-test
     run-with-memory-store
     run-with-redis-store
-    (partial run-with-postgres-store {:ttl/threshold 1500})))
+    (partial run-with-bare-postgres-store {:ttl/threshold 1500})
+    (partial run-with-jsonifying-postgres-store {:ttl/threshold 1500})))
 
 (deftest expired-test
   (doto
@@ -232,7 +263,8 @@
         (is (not (sut/expired? *fstore* fkey now)))))
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    run-with-bare-postgres-store
+    run-with-jsonifying-postgres-store))
 
 (defn stale-fstore-test []
   (testing "an `expires-at` in the past means fstore is `stale?` and noisy"
@@ -264,6 +296,7 @@
   (doto stale-fstore-test
     run-with-memory-store
     run-with-redis-store
-    run-with-postgres-store))
+    run-with-bare-postgres-store
+    run-with-jsonifying-postgres-store))
 
 ;; vi:fdm=marker
