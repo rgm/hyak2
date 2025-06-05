@@ -1,2 +1,2 @@
 {:paths ["src"]
- :deps {com.taoensso/carmine {:mvn/version "3.3.0-alpha6"}}}
+ :deps {com.taoensso/carmine {:mvn/version "3.5.0-alpha11"}}}
