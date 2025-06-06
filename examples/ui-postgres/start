@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 IFS=$'\n\t'
 if [[ "${TRACE-0}" == "1" ]]; then
-  set -o xtrace
+	set -o xtrace
 fi
+
 
 export FLIPPER_BANNER="hyak2 ui-postgres example"
 export FLIPPER_COLOR="primary"
+export PORT="${PORT:-9292}"
+
+# generate rack session cookie secret
+
+SESSION_SECRET=$(head -c64 /dev/urandom | base64)
+export SESSION_SECRET=$SESSION_SECRET
+
+# configure connection to feature store
+
 export DATABASE_URL="postgres://localhost:5432/hyak_test"
 export HYAK_TABLE_PREFIX="scratch_"
-export SESSION_SECRET=$(head -c20 /dev/urandom | base64)
 
-(sleep 1; open "http://localhost:9292") & # open web UI 1s after launch
+(
+	sleep 2 # wait for rackup start
+	open "http://localhost:$PORT"
+) &
 
-bundle exec rackup config.ru -p 9292
+rackup config.ru -p "$PORT"

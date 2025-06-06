@@ -1,35 +1,66 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    concurrent-ruby (1.2.2)
+    base64 (0.3.0)
+    bigdecimal (3.2.2)
+    concurrent-ruby (1.3.5)
     crass (1.0.6)
-    erubi (1.12.0)
-    flipper (0.26.0)
+    erubi (1.13.1)
+    flipper (1.3.4)
       concurrent-ruby (< 2)
-    flipper-sequel (0.26.0)
-      flipper (~> 0.26.0)
+    flipper-sequel (1.3.4)
+      flipper (~> 1.3.4)
       sequel (>= 4.0.0, < 6)
-    flipper-ui (0.26.0)
+    flipper-ui (1.3.4)
       erubi (>= 1.0.0, < 2.0.0)
-      flipper (~> 0.26.0)
-      rack (>= 1.4, < 3)
-      rack-protection (>= 1.5.3, <= 4.0.0)
-      sanitize (< 7)
-    nokogiri (1.14.2-arm64-darwin)
+      flipper (~> 1.3.4)
+      rack (>= 1.4, < 4)
+      rack-protection (>= 1.5.3, < 5.0.0)
+      rack-session (>= 1.0.2, < 3.0.0)
+      sanitize (< 8)
+    logger (1.7.0)
+    nokogiri (1.18.8-aarch64-linux-gnu)
       racc (~> 1.4)
-    pg (1.4.6)
-    racc (1.6.2)
-    rack (2.2.6.2)
-    rack-protection (3.0.5)
-      rack
-    sanitize (6.0.1)
+    nokogiri (1.18.8-aarch64-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.18.8-arm-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.18.8-arm-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.18.8-arm64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.18.8-x86_64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.18.8-x86_64-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.18.8-x86_64-linux-musl)
+      racc (~> 1.4)
+    pg (1.5.9)
+    racc (1.8.1)
+    rack (3.1.16)
+    rack-protection (4.1.1)
+      base64 (>= 0.1.0)
+      logger (>= 1.6.0)
+      rack (>= 3.0.0, < 4)
+    rack-session (2.1.1)
+      base64 (>= 0.1.0)
+      rack (>= 3.0.0)
+    sanitize (7.0.0)
       crass (~> 1.0.2)
-      nokogiri (>= 1.12.0)
-    sequel (5.65.0)
-    webrick (1.8.1)
+      nokogiri (>= 1.16.8)
+    sequel (5.93.0)
+      bigdecimal
+    webrick (1.9.1)
 
 PLATFORMS
-  arm64-darwin-21
+  aarch64-linux-gnu
+  aarch64-linux-musl
+  arm-linux-gnu
+  arm-linux-musl
+  arm64-darwin
+  x86_64-darwin
+  x86_64-linux-gnu
+  x86_64-linux-musl
 
 DEPENDENCIES
   flipper
@@ -37,8 +68,9 @@ DEPENDENCIES
   flipper-ui
   pg
   rack
+  rack-session
   sequel
   webrick
 
 BUNDLED WITH
-   2.3.15
+   2.6.7
