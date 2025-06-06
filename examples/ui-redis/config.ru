@@ -2,13 +2,14 @@
 
 # https://www.flippercloud.io/docs/ui
 
+require 'bundler/setup'
 require 'flipper-ui'
 require 'flipper/adapters/redis'
+require 'rack/session/cookie'
 
 options = {}
 
 options[:url] = ENV['REDIS_URL']
-options[:password] = ENV['REDIS_PASSWORD'] if ENV['REDIS_PASSWORD']
 # use below when eg. heroku gives self-signed rediss://
 # options[:ssl_params] = { verify_mode: OpenSSL::SSL::VERIFY_NONE }
 
@@ -29,8 +30,8 @@ Flipper::UI.configure do |config|
 end
 
 run Flipper::UI.app(fstore) { |builder|
-  secret = ENV.fetch('SESSION_SECRET') { SecureRandom.hex(20) }
-  builder.use(Rack::Session::Cookie, secret:)
+  secret = ENV.fetch('SESSION_SECRET') { SecureRandom.hex(64) }
+  builder.use Rack::Session::Cookie, secret: secret
   builder.use Rack::Auth::Basic do |_username, password|
     password == 'secret'
   end

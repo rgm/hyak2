@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 IFS=$'\n\t'
 if [[ "${TRACE-0}" == "1" ]]; then
-  set -o xtrace
+	set -o xtrace
 fi
 
 export FLIPPER_BANNER="hyak2 ui-redis example"
 export FLIPPER_COLOR="primary"
-export REDIS_URL="redis://localhost:6379/1"
-export REDIS_PASSWORD="someredispassword"
-export SESSION_SECRET=$(head -c20 /dev/urandom | base64)
+export PORT="${PORT:-9292}"
 
-(sleep 1; open "http://localhost:9292") & # open web UI 1s after launch
+# generate rack session cookie secret
 
-bundle exec rackup config.ru -p 9292
+SESSION_SECRET=$(head -c64 /dev/urandom | base64)
+export SESSION_SECRET=$SESSION_SECRET
+
+# configure connection to feature store
+
+export REDIS_URL="redis://:someredispassword@localhost:6379/1"
+
+(
+	sleep 2 # wait for rackup start
+	open "http://localhost:$PORT"
+) &
+
+rackup config.ru -p "$PORT"

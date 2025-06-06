@@ -2,7 +2,9 @@
 
 # https://www.flippercloud.io/docs/ui
 
+require 'bundler/setup'
 require 'sequel'
+require 'rack/session/cookie'
 
 # configure Sequel before requiring flipper-sequel
 DB = Sequel.connect ENV['DATABASE_URL']
@@ -34,8 +36,8 @@ Flipper::UI.configure do |config|
 end
 
 run Flipper::UI.app(fstore) { |builder|
-  secret = ENV.fetch('SESSION_SECRET') { SecureRandom.hex(20) }
-  builder.use(Rack::Session::Cookie, secret:)
+  secret = ENV.fetch('SESSION_SECRET') { SecureRandom.hex(64) }
+  builder.use Rack::Session::Cookie, secret: secret
   builder.use Rack::Auth::Basic do |_username, password|
     password == 'secret'
   end
